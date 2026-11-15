@@ -50,8 +50,11 @@
     const CH = 26;
     const staffOff = CH + 36;
     const tabOff = showScore ? staffOff + 40 + 78 : CH + 56;
-    const sysH = (showTab ? tabOff + (nStr - 1) * TAB_SP : staffOff + 40 + 30) + 40;
-    return { N, barW, nStr, showScore, showTab, CH, staffOff, tabOff, sysH, width: LEFT + N * barW + 24 };
+    const grandStaff = showScore && SDAW.isPianoTrack(track);
+    const lowerStaffOff = staffOff + 92;
+    const scoreBottomOff = (grandStaff ? lowerStaffOff : staffOff) + 40;
+    const sysH = (showTab ? tabOff + (nStr - 1) * TAB_SP : scoreBottomOff + 30) + 40;
+    return { N, barW, nStr, showScore, showTab, CH, staffOff, tabOff, grandStaff, lowerStaffOff, scoreBottomOff, sysH, width: LEFT + N * barW + 24 };
   }
   const BT = () => SDAW.barTicks();               // ticks per bar (time signature)
   function tickX(L, tick) {
@@ -97,9 +100,10 @@
     const T = (x, y, txt, a) => add(svg('text', Object.assign({ x, y, fill: INK, 'font-size': 12 }, a || {}), txt));
     const isGuitar = t.type === 'guitar' || t.type === 'bass';
     const avgP = vnotes.length ? vnotes.reduce((a, n) => a + n.pitch, 0) / vnotes.length : 60;
-    const bassClef = t.type === 'bass' || (!isGuitar && avgP < 52);
+    const bassClef = !L.grandStaff && (t.type === 'bass' || (!isGuitar && avgP < 52));
     const written = (p) => isGuitar ? p + 12 : p;
-    const bottomStep = bassClef ? stepOf(43) : stepOf(64);
+    const staves = [{ offset: L.staffOff, bass: bassClef }];
+    if (L.grandStaff) staves.push({ offset: L.lowerStaffOff, bass: true });
     const marks = song.barMarks || {};
     const multiVoiceTrack = vnotes.some(n => n.voice);
 
@@ -109,16 +113,24 @@
     /* ---------------------------------------------- staves and bars --- */
     for (let ln = 0; ln < lines; ln++) {
       const y0 = 26 + ln * L.sysH;
-      const staffTop = y0 + L.staffOff, staffBot = staffTop + 40, tabTop = y0 + L.tabOff, tabBot = tabTop + (L.nStr - 1) * TAB_SP;
+      const staffTop = y0 + L.staffOff, staffBot = y0 + L.scoreBottomOff, tabTop = y0 + L.tabOff, tabBot = tabTop + (L.nStr - 1) * TAB_SP;
       const firstBar = ln * L.N, barsHere = Math.min(L.N, song.bars - firstBar);
       const x1 = LEFT + barsHere * L.barW;
       if (L.showScore) {
-        for (let i = 0; i < 5; i++) add(svg('line', { x1: 14, y1: staffTop + i * 10, x2: x1, y2: staffTop + i * 10, stroke: INK, 'stroke-width': 1 }));
-        T(16, bassClef ? staffTop + 30 : staffTop + 36, bassClef ? '𝄢' : '𝄞', { 'font-size': bassClef ? 34 : 44, class: 'music' });
-        if (isGuitar) T(26, bassClef ? staffTop + 52 : staffTop + 58, '8', { 'font-size': 9 });
-        if (ln === 0) {
-          T(52, staffTop + 18, String(SDAW.timeSig(song).num), { 'font-size': 19, 'font-weight': 800, 'text-anchor': 'middle' });
-          T(52, staffTop + 38, String(SDAW.timeSig(song).den), { 'font-size': 19, 'font-weight': 800, 'text-anchor': 'middle' });
+        staves.forEach(({ offset, bass }) => {
+          const top = y0 + offset;
+          for (let i = 0; i < 5; i++) add(svg('line', { x1: 14, y1: top + i * 10, x2: x1, y2: top + i * 10, stroke: INK, 'stroke-width': 1 }));
+          T(16, top + (bass ? 30 : 36), bass ? '𝄢' : '𝄞', { 'font-size': bass ? 34 : 44, class: 'music' });
+          if (isGuitar) T(26, top + (bass ? 52 : 58), '8', { 'font-size': 9 });
+          if (ln === 0) {
+            T(52, top + 18, String(SDAW.timeSig(song).num), { 'font-size': 19, 'font-weight': 800, 'text-anchor': 'middle' });
+            T(52, top + 38, String(SDAW.timeSig(song).den), { 'font-size': 19, 'font-weight': 800, 'text-anchor': 'middle' });
+          }
+        });
+        if (L.grandStaff) {
+          const middle = (staffTop + staffBot) / 2;
+          add(svg('line', { x1: 14, y1: staffTop, x2: 14, y2: staffBot, stroke: INK }));
+          add(svg('path', { d: `M12 ${staffTop} C1 ${staffTop + 13} 14 ${middle - 10} 3 ${middle} C14 ${middle + 10} 1 ${staffBot - 13} 12 ${staffBot}`, fill: 'none', stroke: INK, 'stroke-width': 1.6 }));
         }
       }
       if (L.showTab) {
@@ -130,7 +142,7 @@
         if (L.showTab) add(svg('line', { x1: x, y1: tabTop, x2: x, y2: tabBot, stroke: INK, 'stroke-width': w || 1 }));
       };
       const dots = (x) => {
-        if (L.showScore) [15, 25].forEach(dy => add(svg('circle', { cx: x, cy: staffTop + dy, r: 2.2, fill: INK })));
+        if (L.showScore) staves.forEach(({ offset }) => [15, 25].forEach(dy => add(svg('circle', { cx: x, cy: y0 + offset + dy, r: 2.2, fill: INK }))));
         if (L.showTab) [0.36, 0.64].forEach(f => add(svg('circle', { cx: x, cy: tabTop + (tabBot - tabTop) * f, r: 2.2, fill: INK })));
       };
       for (let b = 0; b <= barsHere; b++) {
@@ -172,59 +184,79 @@
     /* ----------------------------------------------------------- notes --- */
     const sel = new Set(nt.printTarget ? [] : s.sel.noteIds);
     const key = (st) => Math.round(st * 24);
-    const groups = new Map();             // "start|voice" -> notes
+    const groups = new Map();
     // every note gets a string; notes of one chord on different strings (SDAW.fixStrings, model.js)
     SDAW.fixStrings(vnotes, t.type);
     vnotes.forEach(n => {
-      const k = key(n.start) + '|' + (n.voice || 0);
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(n);
+      const staff = L.grandStaff ? SDAW.pianoStaffForPitch(n.pitch) : 1;
+      const voice = n.voice || 0;
+      const k = key(n.start) + '|' + staff + '|' + voice;
+      if (!groups.has(k)) groups.set(k, { notes: [], staff, voice });
+      groups.get(k).notes.push(n);
     });
-    const glist = [...groups.values()].map(g => ({ notes: g.sort((a, b) => a.pitch - b.pitch), start: g[0].start, voice: g[0].voice || 0 })).sort((a, b) => a.start - b.start || a.voice - b.voice);
-    const voicesInBar = {};
-    glist.forEach(g => { const b = Math.floor(g.start / BT()); (voicesInBar[b] = voicesInBar[b] || new Set()).add(g.voice); });
+    const glist = [...groups.values()];
+    glist.forEach(g => {
+      g.notes.sort((a, b) => a.pitch - b.pitch);
+      g.start = g.notes[0].start;
+    });
+    glist.sort((a, b) => a.start - b.start || a.voice - b.voice);
+    const groupsInBar = new Map();
+    const barKey = (staff, bar) => staff + '|' + bar;
+    const voiceKey = g => g.staff + '|' + g.voice;
+    glist.forEach(g => {
+      const k = barKey(g.staff, Math.floor(g.start / BT()));
+      if (!groupsInBar.has(k)) groupsInBar.set(k, new Map());
+      const voices = groupsInBar.get(k);
+      if (!voices.has(g.voice)) voices.set(g.voice, []);
+      voices.get(g.voice).push(g);
+    });
 
     // rests (score)
     if (L.showScore) {
-      for (let b = 0; b < song.bars; b++) {
-        const vs = voicesInBar[b] || new Set([0]);
-        const vlist = [...vs]; if (!vlist.includes(0)) vlist.push(0);
-        vlist.forEach(v => {
-          const bs = b * BT(), be = bs + BT(), multi = vlist.length > 1;
-          const cov = glist.filter(g => g.voice === v && g.start >= bs && g.start < be).map(g => [g.start, Math.min(be, g.start + Math.max(...g.notes.map(n => n.dur)))]);
-          let cur = bs; const gaps = [];
-          cov.sort((a, c) => a[0] - c[0]).forEach(([a, z]) => { if (a > cur + 0.01) gaps.push([cur, a - cur]); cur = Math.max(cur, z); });
-          if (cur < be - 0.01) gaps.push([cur, be - cur]);
-          const ln = lineOf(L, bs), staffTop = 26 + ln * L.sysH + L.staffOff;
-          const col = multi ? VOICE_COLORS[v] : INK;
-          gaps.forEach(([gs, gl]) => {
-            const full = gs - bs < 0.01 && gl >= BT() - 0.01;            // an empty bar: one whole rest in the middle (any meter)
-            (full ? [[0, 16]] : restsFor(gs - bs, gl)).forEach(([rt, rv]) => {
-            const x = (full && !multi) ? LEFT + (b % L.N) * L.barW + L.barW / 2 : tickX(L, bs + rt);
-            const dy = multi ? (v % 2 ? 10 : -8) : 0;
-            T(x, staffTop + dy + (rv >= 8 ? (rv === 16 ? 12 : 20) : 26), REST_GLYPH[rv], { 'font-size': 26, class: 'music', fill: col, 'text-anchor': 'middle' });
+      staves.forEach(({ offset }, i) => {
+        for (let b = 0; b < song.bars; b++) {
+          const voices = groupsInBar.get(barKey(i + 1, b)) || new Map();
+          const vlist = [...voices.keys()]; if (!vlist.includes(0)) vlist.push(0);
+          vlist.forEach(v => {
+            const bs = b * BT(), be = bs + BT(), multi = vlist.length > 1;
+            let cur = bs; const gaps = [];
+            (voices.get(v) || []).forEach(g => {
+              if (g.start > cur + 0.01) gaps.push([cur, g.start - cur]);
+              cur = Math.max(cur, Math.min(be, g.start + Math.max(...g.notes.map(n => n.dur))));
+            });
+            if (cur < be - 0.01) gaps.push([cur, be - cur]);
+            const ln = lineOf(L, bs), staffTop = 26 + ln * L.sysH + offset;
+            const col = multi ? VOICE_COLORS[v] : INK;
+            gaps.forEach(([gs, gl]) => {
+              const full = gs - bs < 0.01 && gl >= BT() - 0.01;
+              (full ? [[0, 16]] : restsFor(gs - bs, gl)).forEach(([rt, rv]) => {
+                const x = (full && !multi) ? LEFT + (b % L.N) * L.barW + L.barW / 2 : tickX(L, bs + rt);
+                const dy = multi ? (v % 2 ? 10 : -8) : 0;
+                T(x, staffTop + dy + (rv >= 8 ? (rv === 16 ? 12 : 20) : 26), REST_GLYPH[rv], { 'font-size': 26, class: 'music', fill: col, 'text-anchor': 'middle' });
+              });
             });
           });
-        });
-      }
+        }
+      });
     }
 
     // previous note on the same voice (for slides, h/p, ties)
-    const prevOf = {};
-    const lastByVoice = {};
-    glist.forEach(g => { prevOf[key(g.start) + '|' + g.voice] = lastByVoice[g.voice] || null; lastByVoice[g.voice] = g; });
-
-    const tupletRuns = {};                // voice -> [groups]
+    const lastByVoice = new Map();
+    const tupletRuns = {};                // staff and voice -> [groups]
     glist.forEach(g => {
       const ln = lineOf(L, g.start), y0 = 26 + ln * L.sysH;
-      const staffTop = y0 + L.staffOff, staffBot = staffTop + 40, tabTop = y0 + L.tabOff;
+      const staff = staves[g.staff - 1];
+      const staffTop = y0 + staff.offset, staffBot = staffTop + 40, tabTop = y0 + L.tabOff;
+      const bottomStep = stepOf(staff.bass ? 43 : 64);
       const x = tickX(L, g.start);
       const n0 = g.notes[g.notes.length - 1];
       const dur = Math.max(...g.notes.map(baseDur));
       const sym = symbolFor(dur);
-      const multi = (voicesInBar[Math.floor(g.start / BT())] || new Set()).size > 1;
+      const multi = groupsInBar.get(barKey(g.staff, Math.floor(g.start / BT()))).size > 1;
       const vcol = multiVoiceTrack ? VOICE_COLORS[g.voice] : INK;
-      const prev = prevOf[key(g.start) + '|' + g.voice];
+      const vk = voiceKey(g);
+      const prev = lastByVoice.get(vk);
+      lastByVoice.set(vk, g);
       const tech = n0.tech || {};
 
       if (L.showScore) {
@@ -282,13 +314,13 @@
         const pd = prev && prev.notes[prev.notes.length - 1].dyn;
         if (n0.dyn && n0.dyn !== pd) T(x - 6, staffBot + 24, n0.dyn, { 'font-size': 15, 'font-weight': 800, 'font-style': 'italic', 'font-family': 'Times New Roman, serif' });
         if (tech.hair) {
-          const nxt = glist.find(q => q.voice === g.voice && q.start > g.start);
+          const nxt = glist.find(q => voiceKey(q) === vk && q.start > g.start);
           const ex = nxt && lineOf(L, nxt.start) === ln ? tickX(L, nxt.start) - 6 : x + 40;
           const yh = staffBot + 20;
           add(svg('path', { d: tech.hair === '<' ? `M${ex} ${yh - 5} L${x} ${yh} L${ex} ${yh + 5}` : `M${x} ${yh - 5} L${ex} ${yh} L${x} ${yh + 5}`, fill: 'none', stroke: INK, 'stroke-width': 1.2 }));
         }
         // tuplet runs
-        if (n0.tup) (tupletRuns[g.voice] = tupletRuns[g.voice] || []).push({ g, x, up, yEnd, ln });
+        if (n0.tup) (tupletRuns[vk] = tupletRuns[vk] || []).push({ g, x, up, yEnd, ln });
       }
 
       if (L.showTab) {
@@ -380,7 +412,7 @@
     if (nt.printTarget) { nt.L = L; paper.appendChild(root); return; }      // print: no cursor / playhead
     const cl = lineOf(L, s.sel.cursor), cy0 = 26 + cl * L.sysH, cx = tickX(L, s.sel.cursor);
     const cTop = cy0 + (L.showScore ? L.staffOff - 14 : L.tabOff - 14);
-    const cBot = cy0 + (L.showTab ? L.tabOff + (L.nStr - 1) * TAB_SP + 12 : L.staffOff + 54);
+    const cBot = cy0 + (L.showTab ? L.tabOff + (L.nStr - 1) * TAB_SP + 12 : L.scoreBottomOff + 14);
     const vc = VOICE_COLORS[s.sel.voice];
     add(svg('rect', { x: cx - 9, y: cTop, width: 18, height: cBot - cTop, rx: 4, fill: s.sel.voice ? vc + '22' : 'rgba(255,190,40,.18)', stroke: s.sel.voice ? vc : 'rgba(230,160,0,.8)', 'stroke-width': 1 }));
     if (L.showTab) {
@@ -426,7 +458,7 @@
     const x = tickX(L, Math.min(tick, SDAW.store.songTicks() - 0.01));
     nt.playheadEl.setAttribute('x1', x); nt.playheadEl.setAttribute('x2', x);
     nt.playheadEl.setAttribute('y1', y0 + (L.showScore ? L.staffOff - 16 : L.tabOff - 16));
-    nt.playheadEl.setAttribute('y2', y0 + (L.showTab ? L.tabOff + (L.nStr - 1) * TAB_SP + 14 : L.staffOff + 56));
+    nt.playheadEl.setAttribute('y2', y0 + (L.showTab ? L.tabOff + (L.nStr - 1) * TAB_SP + 14 : L.scoreBottomOff + 16));
     nt.playheadEl.setAttribute('opacity', 1);
     if (SDAW.audio.playing && nt.lastLine !== ln) { nt.lastLine = ln; $('#view-notation').scrollTop = Math.max(0, y0 - 10); }
   };

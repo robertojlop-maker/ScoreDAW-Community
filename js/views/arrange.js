@@ -41,18 +41,18 @@
     /* ---- ruler ---- */
     const rulerRow = el('div', { class: 'arr-ruler-row', style: { height: RULER_H + 'px' } });
     rulerRow.appendChild(el('div', { class: 'arr-corner', style: { width: headW() + 'px', minWidth: headW() + 'px' } }, 'Bars · Sections'));
-    const ruler = el('canvas', { 'data-help': 'Timeline: click to move the playhead. Sections: double-click to rename / add, Shift+click to loop a section, right-click to delete.' });
+    const ruler = el('canvas', { 'data-help': 'Timeline: click to set playback position. Alt+click sets the exact step. Sections: double-click to rename / add, Shift+click to loop, right-click for options.' });
     ruler.width = W; ruler.height = RULER_H; ruler.style.width = W + 'px'; ruler.style.height = RULER_H + 'px';
     drawRuler(ruler.getContext('2d'), W);
     ruler.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
       const tick = Math.floor(e.offsetX / arr.tickW);
       if (e.offsetY > 22) {
         const sec = secAt(tick);
-        if (sec && e.button === 2) return;
         if (sec && e.shiftKey) { SDAW.audio.loop = { on: true, start: sec.start * BAR(), end: (sec.start + sec.length) * BAR() }; SDAW.app.syncTransport(); arr.render(); SDAW.toast('Looping section: ' + sec.name); return; }
         if (sec) { SDAW.audio.seek(sec.start * BAR()); return; }
       }
-      SDAW.audio.seek(snapBeat(tick, true));
+      SDAW.audio.seek(e.altKey ? tick : snapBeat(tick, true));
     });
     ruler.addEventListener('contextmenu', e => {
       e.preventDefault();
@@ -89,7 +89,7 @@
     const rows = el('div', { class: 'arr-rows' });
     song.tracks.forEach((t, i) => rows.appendChild(trackRow(t, i)));
     const H = Math.max(1, song.tracks.length * trackH());
-    const lanes = el('canvas', { class: 'arr-lanes', 'data-help': 'Blocks: drag = move · Ctrl+drag = copy · right edge = length · double-click = edit · right-click = options. Double-click empty space = new block.' });
+    const lanes = el('canvas', { class: 'arr-lanes', 'data-help': 'Click a block to set where the song plays from. Alt+click selects the exact step. Drag to move, Ctrl+drag to copy, or drag the right edge to resize. Double-click to edit.' });
     lanes.width = W; lanes.height = H;
     lanes.style.left = headW() + 'px'; lanes.style.width = W + 'px'; lanes.style.height = H + 'px';
     arr.lanes = lanes;
@@ -157,6 +157,16 @@
   };
 
   /* ------------------------------------------------------- mouse ---- */
+  function showTrackEditor(track) {
+    if (track.type === 'drums') {
+      SDAW.pattern.rack.open[track.id] = true;
+      SDAW.app.showView('pattern');
+      $('#view-pattern .ch-name.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    } else {
+      SDAW.app.showView(track.type === 'guitar' ? 'scoretab' : 'score');
+    }
+  }
+
   function onLaneDown(e) {
     if (e.button !== 0) return;
     SDAW.app.focusZone = 'arrange';
@@ -168,7 +178,10 @@
     if (!hit) {
       s.sel.clipId = null;
       s.selectTrack(t.id);
-      s.setCursor(snapBeat(pos.tick));
+      const tick = e.altKey ? pos.tick : snapBeat(pos.tick);
+      s.setCursor(tick);
+      if (!SDAW.audio.playing && !SDAW.audio.patternMode) SDAW.audio.seek(tick);
+      showTrackEditor(t);
       return;
     }
     s.selectClip(t.id, hit.id);
@@ -209,6 +222,11 @@
       window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up);
       if (!moved) {                     // plain click on a block: the cursor goes there (split point)
         s.sel.cursor = e.altKey ? pos.tick : snapBeat(pos.tick);
+        if (!SDAW.audio.playing && !SDAW.audio.patternMode) {
+          SDAW.audio.seek(SDAW.clamp(s.sel.cursor, hit.start, hit.start + hit.len - 1));
+        }
+        showTrackEditor(t);
+        if (t.type !== 'drums') SDAW.notation.scrollToTick(s.sel.cursor);
         drawLanes();
         return;
       }
@@ -231,6 +249,7 @@
       if (!p) { p = SDAW.rhythmPattern('Pop'); s.mutate('New beat', song => song.patterns.push(p)); }
       let clip; s.mutate('Place beat', () => { clip = s.placePattern(t, p, start, p.length); });
       s.selectClip(t.id, clip.id);
+      showTrackEditor(t);
     } else {
       let clip;
       s.mutate('New pattern', song => {
@@ -239,7 +258,7 @@
       });
       s.sel.cursor = start;
       s.selectClip(t.id, clip.id);
-      SDAW.app.showView(t.type === 'guitar' || t.type === 'bass' ? 'scoretab' : 'pianoroll');
+      showTrackEditor(t);
       SDAW.toast('New empty pattern — write notes with the fretboard, piano or tab');
     }
   }
@@ -248,11 +267,9 @@
     const s = SDAW.store;
     s.selectClip(t.id, c.id);
     if (c.kind === 'audio') return SDAW.toast('Audio block — drag the right edge to shorten it, right-click for options');
-    const p = s.pattern(c.patternId);
     s.sel.cursor = c.start;
-    if (p.kind === 'drums') SDAW.app.showView('pattern');
-    else SDAW.app.showView(t.type === 'guitar' || t.type === 'bass' ? 'scoretab' : 'pianoroll');
-    if (p.kind !== 'drums') SDAW.notation.scrollToTick(c.start);
+    showTrackEditor(t);
+    if (t.type !== 'drums') SDAW.notation.scrollToTick(c.start);
   }
 
   function onLaneMenu(e) {
@@ -311,8 +328,12 @@
     const sel = s.sel.trackId === t.id;
     const head = el('div', {
       class: 'trk-head' + (sel ? ' sel' : ''), style: { width: headW() + 'px', minWidth: headW() + 'px' },
-      'data-help': 'Track "' + t.name + '" — click to select, double-click the name to rename, right-click for more options.',
-      onmousedown: () => { SDAW.app.focusZone = 'arrange'; s.selectTrack(t.id); },
+      'data-help': 'Track "' + t.name + '" — click to select and open its editor. Double-click the name to rename, right-click for options.',
+      onmousedown: e => {
+        SDAW.app.focusZone = 'arrange';
+        s.selectTrack(t.id);
+        if (e.button === 0) showTrackEditor(t);
+      },
       oncontextmenu: (e) => { e.preventDefault(); trackMenu(t, e); }
     }, [
       el('div', { class: 'trk-num', style: { background: t.color, boxShadow: '0 0 10px ' + t.color + '88' } }, String(i + 1)),

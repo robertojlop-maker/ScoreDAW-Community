@@ -1110,7 +1110,7 @@
     const s = SDAW.store;
     const song = SG.createSong(opts);
     s.beginEdit();
-    if (SDAW.app && SDAW.app.loadSong) SDAW.app.loadSong(song, true); else s.load(song, true);
+    if (SDAW.app?.loadNewSong) SDAW.app.loadNewSong(song, true); else s.load(song, true);
     const v = song.vocals, CH = { harmony: 'harmonies', oohs: 'oohs', call: 'coro (call & response)', hook: 'gang hook' };
     const vx = v ? ' · ' + (v.gender === 'female' ? 'female' : 'male') + ' singer' + (v.voices ? ' + ' + v.voices + '-voice ' + CH[v.choir] : '') : '';
     const hero = SDAW.legends && SDAW.legends.lastHero ? ' · lead guitar in the style of ' + SDAW.legends.lastHero : '';

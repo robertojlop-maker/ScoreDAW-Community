@@ -87,6 +87,7 @@
     return null;
   };
   app.patPreview = false;       // true while the editor transport is playing
+  let songTickBeforePreview = 0;
   app.previewOffset = 0;        // song position of the previewed block (for the score playhead)
 
   app.playViewPattern = function (fromStart) {
@@ -94,7 +95,8 @@
     if (A.playing && app.patPreview && !fromStart) { app.stopViewPattern(); return; }
     const p = app.viewPattern();
     if (!p) return SDAW.toast('No pattern here yet — write some notes or create a pattern first');
-    if (A.playing) A.stop();
+    if (!app.patPreview) songTickBeforePreview = A.getTick();
+    if (A.playing || A.preparing) A.stop();
     s.sel.patternId = p.id;
     const t = s.selTrack(), c = t && t.clips.find(x => x.patternId === p.id && s.sel.cursor >= x.start && s.sel.cursor < x.start + x.len) || (t && t.clips.find(x => x.patternId === p.id));
     app.previewOffset = c ? c.start : 0;
@@ -106,13 +108,13 @@
   };
   app.stopViewPattern = function () {
     const A = SDAW.audio;
-    if (A.playing) A.stop();
-    if (app.patPreview) { app.patPreview = false; A.patternMode = false; A.stopTick = 0; }
+    if (A.playing || A.preparing) A.stop();
+    if (app.patPreview) { app.patPreview = false; A.patternMode = false; A.stopTick = songTickBeforePreview; }
     app.syncTransport(); syncMini();
   };
   app.rewindViewPattern = function () {
     if (SDAW.audio.playing && app.patPreview) app.playViewPattern(true);
-    else { SDAW.audio.stopTick = 0; SDAW.toast('Back to the start of the pattern'); }
+    else SDAW.toast('Back to the start of the pattern');
   };
 
   function miniTransport() {
@@ -146,9 +148,13 @@
 
   /* ==================================================== TRANSPORT ===== */
   app.togglePlay = function () {
-    if (app.patPreview) { app.stopViewPattern(); if (!SDAW.audio.patternMode) { SDAW.audio.play(0); return; } }
-    if (SDAW.audio.playing || SDAW.audio.preparing) SDAW.audio.stop();       // also cancels "loading the real instruments"
+    if (app.patPreview) app.stopViewPattern();
+    if (SDAW.audio.playing || SDAW.audio.preparing) app.pause();
     else SDAW.audio.play(Math.floor(SDAW.audio.stopTick || 0));
+  };
+  app.pause = function () {
+    if (app.patPreview) app.stopViewPattern();
+    else if (SDAW.audio.playing || SDAW.audio.preparing) SDAW.audio.stop();
   };
   app.stop = function () {
     if (app.patPreview) { app.stopViewPattern(); return; }
@@ -176,18 +182,18 @@
     SDAW.toast(app.recording ? 'Recording on the selected track — play the PC keys, piano, fretboard or MIDI keyboard' : 'Recording stopped');
   };
   app.toggleLoop = function () {
-    const L = SDAW.audio.loop;
-    if (L.on && L.end !== null) { L.end = null; L.start = 0; }  // section loop -> song loop
-    else L.on = !L.on;
+    SDAW.audio.loop = { on: !SDAW.audio.loop.on, start: 0, end: null };
     app.syncTransport();
     SDAW.arrange.render();
   };
   app.syncTransport = function () {
     $('#btnPlay').classList.toggle('playing', SDAW.audio.playing);
     $('#btnPlay').textContent = SDAW.audio.playing ? '❚❚' : '▶';
+    $('#btnPause').disabled = !(SDAW.audio.playing || SDAW.audio.preparing);
     $('#btnRec').classList.toggle('on', app.recording);
     $('#btnRec').classList.toggle('audio', !!SDAW.recorder.take);
     $('#btnLoop').classList.toggle('on', SDAW.audio.loop.on);
+    $('#btnLoop').setAttribute('aria-pressed', String(SDAW.audio.loop.on));
     $('#btnMetronome').classList.toggle('on', CONFIG.audio.metronome);
     const pm = $('#btnPatMode');
     pm.textContent = SDAW.audio.patternMode ? 'PAT' : 'SONG';
@@ -344,13 +350,46 @@
     f.text().then(text => app.openProjectText(text, f.name)).catch(err => SDAW.toast('⚠ Could not open ' + f.name + ': ' + err.message + ' — the current project is still open'));
   }
   app.loadSong = function (song, keepUndo) {
+    if (app.patPreview) app.stopViewPattern();
     if (SDAW.audio.playing || SDAW.audio.preparing) SDAW.audio.stop();
     if (!keepUndo) app.fileHandle = null;            // Ctrl+S of another project asks for a file again
     SDAW.audio.patternMode = false;
     SDAW.audio.stopTick = 0;
-    SDAW.audio.loop = { on: true, start: 0, end: null };
+    SDAW.audio.loop = { on: false, start: 0, end: null };
     SDAW.store.load(song, keepUndo);
     syncParams();
+    app.syncTransport();
+  };
+
+  function showNewSongEditor() {
+    const s = SDAW.store, song = s.song;
+    const specs = song.gen?.by === 'songgen' ? SDAW.songgen.styleOf(song.gen.opts).tracks : null;
+    const lead = song.tracks.find(track => track.type === 'guitar' && (specs
+      ? specs.some(spec => spec.id === track.styleTrack && spec.lead)
+      : SDAW.autogen.autoRole(track, song) === 'melody'));
+    const drums = song.tracks.find(track => track.type === 'drums');
+    const track = lead || drums;
+    if (!track) return false;
+
+    s.selectTrack(track.id);
+    if (lead) {
+      app.showView('scoretab');
+      const firstNote = s.trackNotes(lead)[0];
+      SDAW.notation.scrollToTick(firstNote?.start ?? 0);
+    } else {
+      const clip = drums.clips.find(c => c.kind === 'pattern' && s.pattern(c.patternId)?.kind === 'drums');
+      if (clip) s.setCursor(clip.start);
+      SDAW.pattern.rack.open[drums.id] = true;
+      app.showView('pattern');
+      $('#view-pattern .ch-name.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    $('#arrScroll .trk-head.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return true;
+  }
+
+  app.loadNewSong = function (song, keepUndo) {
+    app.loadSong(song, keepUndo);
+    showNewSongEditor();
   };
   /**
    * Autosave: localStorage (fast); when it is full, IndexedDB (no size limit) + one warning.
@@ -490,17 +529,17 @@
         ]),
         el('div', { class: 'wcards' }, [
           el('div', { class: 'wcard style', 'data-help': 'Creates drums, bass, piano, guitar strums and a melody in the chosen style. Everything stays editable.', onclick: () => {
-            const sg = SDAW.buildSong(genreSel.value); app.loadSong(sg); close(); app.showView('scoretab'); SDAW.toast(genreSel.value + ' song ready (' + SDAW.songIdeaText(sg) + ') — press Space to play');
+            const sg = SDAW.buildSong(genreSel.value); close(); app.loadNewSong(sg); SDAW.toast(genreSel.value + ' song ready (' + SDAW.songIdeaText(sg) + ') — press Space to play');
           } }, [el('div', { class: 'wico' }, '🎵'), el('h3', {}, 'Start with a style'), el('p', {}, 'Choose a genre and get a ready-to-edit song.'), genreSel,
             // every option of the Full Song panel: instruments, key, form, progressions, the lead in each section, ending…
             el('button', { class: 'btn small w-custom', 'data-help': 'Choose everything: instruments (add any), singer, key, tempo, form, progressions, complexity, the guitarist style, what the lead plays in each section and the ending',
-              onclick: e => { e.stopPropagation(); SDAW.songgen.open({ genre: genreSel.value, onDone: () => { close(); app.showView('scoretab'); } }); } }, '⚙ Choose everything…')]),
+              onclick: e => { e.stopPropagation(); SDAW.songgen.open({ genre: genreSel.value, onDone: close }); } }, '⚙ Choose everything…')]),
           el('div', { class: 'wcard guitar', onclick: () => {
             app.loadSong(SDAW.emptySong(meterSel.value.split('/').map(Number), 'guitar')); close(); app.showView('scoretab'); SDAW.input.setMode('fretboard');
             SDAW.toast('Click the fretboard or type fret numbers in the tab to start writing');
           } }, [el('div', { class: 'wico' }, '🎸'), el('h3', {}, 'Write for guitar'), el('p', {}, 'Score + tab with the fretboard ready to write, like Guitar Pro.'), el('label', { class: 'w-meter', onclick: e => e.stopPropagation() }, ['Time sig. ', meterSel])]),
           el('div', { class: 'wcard beat', onclick: () => {
-            app.loadSong(SDAW.beatSong('Pop')); close(); app.showView('pattern');
+            close(); app.loadNewSong(SDAW.beatSong('Pop'));
             SDAW.audio.setPatternMode(true); app.syncTransport();
             SDAW.toast('Click the steps to build your beat — Space to play (PAT mode)');
           } }, [el('div', { class: 'wico' }, '🥁'), el('h3', {}, 'Make a beat'), el('p', {}, 'Build a rhythm with the step sequencer and style grooves.')])
@@ -508,7 +547,7 @@
         el('div', { class: 'welcome-foot' }, [
           el('button', { class: 'btn', onclick: () => { close(); app.openFile(); } }, '📂 Open project'),
           el('span', { style: { color: 'var(--text-dim)' } }, 'Popular:'),
-          ...['Pop', 'Rock', 'Salsa', 'Bachata', 'Blues', 'Ballad'].map(g => el('button', { class: 'tpl-chip', onclick: () => { const sg = SDAW.buildSong(g); app.loadSong(sg); close(); SDAW.toast(g + ' template loaded (' + SDAW.songIdeaText(sg) + ')'); } }, g)),
+          ...['Pop', 'Rock', 'Salsa', 'Bachata', 'Blues', 'Ballad'].map(g => el('button', { class: 'tpl-chip', onclick: () => { const sg = SDAW.buildSong(g); close(); app.loadNewSong(sg); SDAW.toast(g + ' template loaded (' + SDAW.songIdeaText(sg) + ')'); } }, g)),
           el('button', { class: 'tpl-chip', 'data-help': 'An empty song with a Grand Piano track, in the time signature chosen on the guitar card', onclick: () => { app.loadSong(SDAW.emptySong(meterSel.value.split('/').map(Number))); close(); } }, 'Empty project'),
           el('span', { class: 'spacer' }),
           el('label', { style: { fontSize: '13px', color: 'var(--text-dim)', display: 'flex', gap: '6px', alignItems: 'center' } }, [
@@ -619,8 +658,9 @@
     let song = null;
     try { song = JSON.parse(localStorage.getItem(CONFIG.app.storageKey) || 'null'); } catch (e) { song = null; }
     const bigAutosave = localStorage.getItem(CONFIG.app.storageKey + '.idb') === '1';
-    if (!song || !song.tracks) song = SDAW.buildSong('Pop');
-    SDAW.audio.loop = { on: true, start: 0, end: null };
+    const needsDemo = !song?.tracks;
+    if (needsDemo) song = SDAW.buildSong('Pop');
+    SDAW.audio.loop = { on: false, start: 0, end: null };
     SDAW.store.load(song);
     // a large project was autosaved in IndexedDB: open it as soon as it is read
     if (bigAutosave) SDAW.samples.loadAutosave().then(json => { if (json) { const sg = JSON.parse(json); if (sg && sg.tracks) app.loadSong(sg); } }).catch(() => {});
@@ -643,6 +683,7 @@
     $('#btnRedo').onclick = () => SDAW.store.redo();
     $('#fileOpen').addEventListener('change', onFileChosen);
     $('#btnPlay').onclick = () => app.togglePlay();
+    $('#btnPause').onclick = () => app.pause();
     $('#btnStop').onclick = () => app.stop();
     $('#btnHome').onclick = () => SDAW.audio.seek(0);
     $('#btnRec').onclick = () => app.toggleRecord();
@@ -678,7 +719,7 @@
 
     SDAW.arrange.render();
     SDAW.inspector.render();
-    app.showView(app.view);
+    if (!(needsDemo && !bigAutosave && showNewSongEditor())) app.showView(app.view);
     app.syncTransport();
     requestAnimationFrame(frame);
     if (CONFIG.ui.showWelcome && !localStorage.getItem('scoredaw.noWelcome')) app.showWelcome();

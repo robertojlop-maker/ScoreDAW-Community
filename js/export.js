@@ -307,6 +307,8 @@
     const s = SDAW.store, song = s.song;
     const isGtr = t.type === 'guitar' || t.type === 'bass';
     const tab = o.tab && isGtr;
+    const piano = SDAW.isPianoTrack(t);
+    const twoStaves = tab || piano;
     const tuning = t.type === 'bass' ? SDAW.BASS_TUNING : CONFIG.guitar.tuning;
     const nStr = tuning.length;
     // notes that cross a barline are split into tied pieces (one per bar)
@@ -339,6 +341,8 @@
           x += `<staves>2</staves><clef number="1">${clef}</clef><clef number="2"><sign>TAB</sign><line>5</line></clef><staff-details number="2"><staff-lines>${nStr}</staff-lines>`;
           tuning.forEach((p, i) => { const [st, al] = SHARP_SP[p % 12]; x += `<staff-tuning line="${i + 1}"><tuning-step>${st}</tuning-step>${al ? `<tuning-alter>${al}</tuning-alter>` : ''}<tuning-octave>${Math.floor(p / 12) - 1}</tuning-octave></staff-tuning>`; });
           x += '</staff-details>';
+        } else if (piano) {
+          x += '<staves>2</staves><clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef>';
         } else x += `<clef>${clef}</clef>`;
         x += '</attributes>';
         x += `<direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${song.tempo}</per-minute></metronome></direction-type><sound tempo="${song.tempo}"/></direction>`;
@@ -357,27 +361,29 @@
       if (o.chords) (song.chords || []).filter(c => c.tick >= t0 && c.tick < t0 + BAR()).forEach(c => { x += chordXml(c.name, Math.round((c.tick - t0) * 6)); });
       // notes of this bar by voice
       const inBar = notes.filter(n => n.start >= t0 - 0.001 && n.start < t0 + BAR() - 0.001);
-      const voices = [...new Set(inBar.map(n => n.voice || 0))].sort();
-      if (!voices.includes(0)) voices.unshift(0);
       const staffBody = (staff) => {
+        const staffNotes = piano ? inBar.filter(n => SDAW.pianoStaffForPitch(n.pitch) === staff) : inBar;
+        const voices = [...new Set(staffNotes.map(n => n.voice || 0))].sort();
+        if (!voices.includes(0)) voices.unshift(0);
+        const staffTag = twoStaves ? `<staff>${staff}</staff>` : '';
         const parts = []; let first = true;
         voices.forEach(v => {
           if (!first) parts.push(`<backup><duration>${MD()}</duration></backup>`);
           first = false;
           const vn = staff === 2 ? v + 5 : v + 1;
           const groups = [];
-          inBar.filter(n => (n.voice || 0) === v).sort((a, b) => a.start - b.start || a.pitch - b.pitch).forEach(n => {
+          staffNotes.filter(n => (n.voice || 0) === v).sort((a, b) => a.start - b.start || a.pitch - b.pitch).forEach(n => {
             const st = Math.round((n.start - t0) * 6);
             const g = groups.find(q => q.st === st);
             if (g) g.notes.push(n); else groups.push({ st, notes: [n], tup: !!n.tup, d: Math.round(n.dur * 6) });
           });
           groups.forEach((g, i) => { const nx = groups[i + 1] ? groups[i + 1].st : MD(); g.d = Math.max(1, Math.min(g.d, nx - g.st, MD() - g.st)); });
           let pos = 0, tripCount = 0, prevIdx = null;
-          const open = staff === 2 ? '<note print-object="no">' : '<note>';     // TAB staff: hidden rests
+          const open = tab && staff === 2 ? '<note print-object="no">' : '<note>';
           const rest = (from, len) => splitDur(from, len).forEach(pc => {
-            parts.push(`${open}<rest/><duration>${pc.d}</duration><voice>${vn}</voice><type>${pc.type}</type>${pc.dot ? '<dot/>' : ''}${pc.tup ? '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' : ''}${tab ? `<staff>${staff}</staff>` : ''}</note>`);
+            parts.push(`${open}<rest/><duration>${pc.d}</duration><voice>${vn}</voice><type>${pc.type}</type>${pc.dot ? '<dot/>' : ''}${pc.tup ? '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' : ''}${staffTag}</note>`);
           });
-          if (!groups.length) { parts.push(`${open}<rest measure="yes"/><duration>${MD()}</duration><voice>${vn}</voice>${tab ? `<staff>${staff}</staff>` : ''}</note>`); return; }
+          if (!groups.length) { parts.push(`${open}<rest measure="yes"/><duration>${MD()}</duration><voice>${vn}</voice>${staffTag}</note>`); return; }
           groups.forEach(g => {
             if (g.st > pos) rest(pos, g.st - pos);
             const pieces = g.tup && [4, 8, 16].includes(g.d) ? [{ d: g.d, type: g.d === 4 ? '16th' : g.d === 8 ? 'eighth' : 'quarter', dot: 0, tup: true }] : splitDur(g.st, g.d);
@@ -396,7 +402,7 @@
                 nt += `<voice>${vn}</voice><type>${pc.type}</type>${pc.dot ? '<dot/>' : ''}`;
                 if (pc.tup) nt += '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>';
                 if (tech.mute) nt += '<notehead>x</notehead>'; else if (tech.ghost) nt += '<notehead parentheses="yes">normal</notehead>';
-                if (tab) nt += `<staff>${staff}</staff>`;
+                nt += staffTag;
                 // notations
                 let no = '';
                 if (tieStop) no += '<tied type="stop"/>'; if (tieStart) no += '<tied type="start"/>';
@@ -448,7 +454,7 @@
       const firstDyn = inBar.find(n => n.dyn);
       if (firstDyn && firstDyn.dyn !== lastDyn) { lastDyn = firstDyn.dyn; x += `<direction placement="below"><direction-type><dynamics><${firstDyn.dyn}/></dynamics></direction-type><offset>${Math.round((firstDyn.start - t0) * 6)}</offset></direction>`; }
       x += staffBody(1);
-      if (tab) { x += `<backup><duration>${4 * DIV}</duration></backup>`; x += staffBody(2); }
+      if (twoStaves) { x += `<backup><duration>${piano ? MD() : 4 * DIV}</duration></backup>`; x += staffBody(2); }
       // right barline
       if (m.fine) x += '<direction placement="above"><direction-type><words>Fine</words></direction-type><sound fine="yes"/></direction>';
       if (m.tocoda) x += '<direction placement="above"><direction-type><words>To Coda</words></direction-type><direction-type><coda/></direction-type><sound tocoda="c1"/></direction>';

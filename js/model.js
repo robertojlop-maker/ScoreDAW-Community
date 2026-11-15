@@ -96,6 +96,14 @@
   SDAW.RIG_ENGINES = ['rig', 'pianorig', 'windrig'];
   SDAW.isRigEngine = e => SDAW.RIG_ENGINES.includes(e);
 
+  SDAW.isPianoTrack = function (track) {
+    if (!track || track.type !== 'keys') return false;
+    const rig = track.engine === 'pianorig' && track.params && track.params.prig;
+    if (rig) return rig === 'grand' || rig === 'epiano';
+    return /\b(?:piano|rhodes|wurlitzer)\b/i.test(track.instrument || '');
+  };
+  SDAW.pianoStaffForPitch = pitch => pitch < 60 ? 2 : 1; // C4 starts the treble staff
+
   /** A new track for a library instrument */
   SDAW.makeTrack = function (inst, name) {
     const rig = SDAW.isRigEngine(inst.engine);   // Guitar / Piano / Wind Rig: own amp + effects

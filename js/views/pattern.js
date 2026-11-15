@@ -270,17 +270,24 @@
     });
     s.setCursor((bar + 1) * BAR());
   }
+  function endLoop() {
+    const A = SDAW.audio;
+    if (A.loop === rack.barLoop) A.loop = rack.previousLoop;
+    rack.looping = false;
+    rack.barLoop = rack.previousLoop = null;
+  }
   function toggleLoop() {
     const A = SDAW.audio, bar = curBar();
-    if (rack.looping) { rack.looping = false; A.stop(); A.loop = { on: true, start: 0, end: null }; pat.render(); return; }
-    if (A.playing) A.stop();
+    if (rack.looping) { endLoop(); A.stop(); SDAW.app.syncTransport(); pat.render(); return; }
+    if (A.playing || A.preparing) A.stop();
     A.patternMode = false;
-    A.loop = { on: true, start: bar * BAR(), end: bar * BAR() + BAR() };
+    rack.previousLoop = A.loop;
+    A.loop = rack.barLoop = { on: true, start: bar * BAR(), end: bar * BAR() + BAR() };
     rack.looping = true;
     A.play(bar * BAR());
     pat.render();
   }
-  SDAW.bus.on('transport', e => { if (e && !e.playing && rack.looping) { rack.looping = false; SDAW.audio.loop = { on: true, start: 0, end: null }; if (SDAW.app.view === 'pattern') pat.render(); } });
+  SDAW.bus.on('transport', e => { if (e && !e.playing && !e.preparing && rack.looping) { endLoop(); if (SDAW.app.view === 'pattern') pat.render(); } });
   function addChannelMenu(e) {
     const items = [];
     CONFIG.library.instruments.forEach(g => g.items.forEach(it => items.push([g.icon + '  ' + it.name, () => { const t = SDAW.addTrackFromInstrument(it); rack.open[t.id] = true; }])));

@@ -44,7 +44,7 @@
     nextTick: 0,         // next tick to schedule
     nextTime: 0,         // ctx time of nextTick
     timer: null,
-    loop: { on: true, start: 0, end: null },  // end null = song end
+    loop: { on: false, start: 0, end: null },  // end null = song end
     index: null,         // tick -> events, rebuilt when the song changes
     lastPitch: {},       // trackId -> last scheduled pitch (for slides)
     patternMode: false,  // true = loop only the current pattern (like FL Studio "PAT")
@@ -1074,8 +1074,12 @@
     return tl[lo][1] + (time - tl[lo][0]) / tickDur();
   };
   A.seek = function (tick) {
-    const was = A.playing;
-    if (was) { A.stop(); A.play(tick); } else { A.stopTick = tick; SDAW.bus.emit('transport', { playing: false, seek: true }); }
+    const was = A.playing || A.preparing;
+    if (was) A.stop();
+    const length = A.patternMode ? (A.patternLen || 16) : SDAW.store.songTicks();
+    A.stopTick = SDAW.clamp(tick, 0, Math.max(0, length - 1));
+    if (was) A.play(A.stopTick);
+    else SDAW.bus.emit('transport', { playing: false, seek: true });
   };
 
   A.tickDur = tickDur;
