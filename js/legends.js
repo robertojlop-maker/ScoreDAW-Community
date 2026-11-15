@@ -312,7 +312,7 @@
   /** [id, label] list for the panels ("Auto" first) */
   L.options = function (style) {
     const pool = (style && style.melody && style.melody.heroes) || [];
-    const ids = pool.filter(x => HEROES[x]).concat(Object.keys(HEROES).filter(x => !pool.includes(x)));
+    const ids = Object.keys(HEROES).sort((a, b) => HEROES[a].name.localeCompare(HEROES[b].name));
     return [['auto', pool.length ? 'Auto — a guitarist of this genre (changes with 🎲)' : 'Auto (none for this genre)'], ['off', 'Off — plain generated melody']]
       .concat(ids.map(id => [id, HEROES[id].name + (pool.includes(id) ? ' ★' : '')]));
   };

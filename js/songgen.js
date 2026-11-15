@@ -959,7 +959,7 @@
   SG.refArtists = function (genre) {
     const d = SDAW.styleData; if (!d) return [];
     return Object.keys(d.artists).map(id => { const a = d.artists[id]; return { id, name: a.name, fits: a.genres.includes(genre), songs: a.songs }; })
-      .sort((x, y) => (y.fits - x.fits) || x.name.localeCompare(y.name));
+      .sort((x, y) => x.name.localeCompare(y.name));
   };
   SG.applyRef = function (st, ref, mode, seed) {
     const d = SDAW.styleData, a = d && ref && d.artists[ref];
