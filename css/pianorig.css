@@ -1,0 +1,82 @@
+/* =============================================================================
+ *  PIANO RIG — extra styles of the Piano Rig window (js/views/pianorig-panel.js).
+ *  The window, cards, knobs, faders, tabs come from guitarrig.css (shared look).
+ * ============================================================================= */
+.prig-win { height: 900px; box-shadow: 0 30px 90px rgba(0, 0, 0, .7), 0 0 60px rgba(255, 210, 63, .16); }
+.prig-win .rig-title b { text-shadow: 0 0 16px rgba(255, 210, 63, .7); }
+.prig-win .rig-model.on { border-color: #ffd23f; background: rgba(255, 210, 63, .16); box-shadow: 0 0 16px rgba(255, 210, 63, .4); }
+.prig-body { bottom: 104px; }
+.rig-lab { font-size: 12.5px; color: var(--text-dim); }
+.rig-warn { padding: 10px 14px; border-radius: 10px; background: rgba(255, 176, 46, .12); border: 1px solid rgba(255, 176, 46, .4); color: #ffcf7a; font-size: 13px; }
+.pg-lab { fill: #d9d6f4; font: 600 13px var(--font); letter-spacing: .06em; }
+.pg-lab.small { font-size: 10px; }
+
+/* ---- keyboard strip at the bottom of the window */
+.prig-kbar { position: absolute; left: 0; right: 0; bottom: 0; height: 104px; display: flex; gap: 10px; align-items: stretch; padding: 10px 16px 12px; border-top: 1px solid var(--line-strong); background: rgba(0, 0, 0, .3); }
+.prig-ped { flex: none; width: 92px; }
+.prig-ped.on { border-color: #2bff88; box-shadow: 0 0 14px rgba(43, 255, 136, .6); color: #2bff88; }
+.prig-kb { position: relative; flex: 1; user-select: none; touch-action: none; border-top: 4px solid #5a1020; border-radius: 0 0 6px 6px; background: #111; }
+.pk { position: absolute; top: 0; cursor: pointer; }
+.pk.w { height: 100%; background: linear-gradient(180deg, #e9e6dc, #fffdf6 15%, #f3efe2); border: 1px solid #5c5868; border-top: 0; border-radius: 0 0 4px 4px; z-index: 1; }
+.pk.b { height: 60%; background: linear-gradient(180deg, #2a2833, #0b0a10 85%, #2b2936); border: 1px solid #000; border-radius: 0 0 3px 3px; z-index: 2; }
+.pk.w.on { background: linear-gradient(180deg, #ffe58a, #ffd23f); box-shadow: 0 0 12px #ffd23f; }
+.pk.b.on { background: linear-gradient(180deg, #ffb02e, #b86a00); }
+.pk i { position: absolute; bottom: 3px; left: 0; right: 0; text-align: center; font: 600 9px var(--font-mono); color: #7a7690; font-style: normal; pointer-events: none; }
+
+/* ---- strings diagram */
+.str-diag { width: 100%; height: 150px; display: block; }
+
+/* ---- electric piano suitcase panel */
+.ep-stage { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 14px; border-radius: 16px; border: 1px solid var(--line);
+  background: radial-gradient(ellipse at 50% 90%, rgba(255, 79, 216, .2), transparent 60%), rgba(0, 0, 0, .25); }
+.ep-front { width: 1100px; padding: 14px 22px; border-radius: 16px; background: linear-gradient(180deg, #2a2b31, #111216); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .12), 0 16px 40px rgba(0, 0, 0, .6), 0 0 0 3px #08080a; }
+.ep-front.wur { background: linear-gradient(180deg, #d4c3a0, #a8956c); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .4), 0 16px 40px rgba(0, 0, 0, .6), 0 0 0 3px #5a4a2a; }
+.ep-logo { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+.ep-logo b { font-family: "Segoe Script", "Brush Script MT", cursive; font-size: 26px; color: #f4f4f8; }
+.ep-front.wur .ep-logo b, .ep-front.wur .ep-logo small { color: #2a1d08; }
+.ep-logo small { font-size: 11px; letter-spacing: .3em; color: #d9d9e4; font-weight: 700; }
+.ep-knobs { display: flex; align-items: center; justify-content: space-around; padding: 8px 10px; border-radius: 10px; background: rgba(0, 0, 0, .35); }
+.ep-front.wur .ep-knobs { background: rgba(60, 40, 10, .25); }
+.ep-knobs .rk.chrome { width: 110px; }
+.ep-knobs .rk.chrome .rk-lab { color: #e8e8f0; text-transform: uppercase; font-size: 10.5px; font-weight: 800; letter-spacing: .1em; }
+.ep-front.wur .ep-knobs .rk.chrome .rk-lab, .ep-front.wur .ep-knobs .rk.chrome .rk-val { color: #1a1405; }
+
+/* ---- organ drawbars */
+.org-bars { display: flex; gap: 14px; justify-content: center; flex-basis: 100%; padding: 6px 0 4px; }
+.org-bar { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.org-bar b { font: 700 16px var(--font-mono); color: #ffd23f; }
+.org-slot { position: relative; width: 44px; height: 230px; border-radius: 6px; background: linear-gradient(180deg, #2a1608, #120904); box-shadow: inset 0 3px 8px rgba(0, 0, 0, .8); cursor: ns-resize; touch-action: none; }
+.org-stick { position: absolute; left: 6px; right: 6px; top: 0; display: flex; flex-direction: column; justify-content: flex-end; transition: height .05s; }
+.org-rod { flex: 1; margin: 0 9px; background: repeating-linear-gradient(180deg, #cfcfd6 0 20px, #8a8a92 20px 22px); border-radius: 0 0 2px 2px; }
+.org-cap { height: 32px; border-radius: 5px 5px 9px 9px; display: flex; align-items: center; justify-content: center; font: 800 10.5px var(--font); box-shadow: 0 4px 8px rgba(0, 0, 0, .6), inset 0 2px 0 rgba(255, 255, 255, .35); }
+.org-stick.brown .org-cap { background: linear-gradient(180deg, #a5622f, #6b3a17); color: #fff; }
+.org-stick.white .org-cap { background: linear-gradient(180deg, #ffffff, #d8d4c8); color: #222; }
+.org-stick.black .org-cap { background: linear-gradient(180deg, #3a3a40, #0d0d10); color: #fff; }
+.seg small { opacity: .65; font-family: var(--font-mono); font-size: 10px; }
+
+/* ---- rotary speaker (CSS 3D, spinning horn and drum) */
+.leslie-stage { flex-basis: 100%; height: 400px; perspective: 1100px; display: flex; justify-content: center; align-items: center; border-radius: 14px;
+  background: radial-gradient(ellipse at 50% 92%, rgba(43, 255, 136, .22), transparent 55%), rgba(0, 0, 0, .25); border: 1px solid var(--line); }
+.leslie { position: relative; width: 250px; height: 360px; transform-style: preserve-3d; transform: rotateX(-6deg) rotateY(-22deg); }
+.leslie > div { position: absolute; left: 0; width: 250px; border-radius: 6px; background: linear-gradient(135deg, #8a5a2c, #4a2a10); box-shadow: inset 0 0 0 4px rgba(0, 0, 0, .35), 0 20px 40px rgba(0, 0, 0, .5); }
+.les-top { top: 0; height: 130px; overflow: hidden; perspective: 400px; background: #120a04 !important; }
+.les-louver { top: 130px; height: 30px; background: repeating-linear-gradient(90deg, #6b3a17 0 10px, #2a1608 10px 14px) !important; }
+.les-bottom { top: 160px; height: 160px; overflow: hidden; background: #120a04 !important; }
+.les-base { top: 320px; height: 40px; }
+.les-horn { position: absolute; left: 50%; top: 55%; width: 220px; height: 30px; margin-left: -110px; margin-top: -15px; transform-style: preserve-3d; animation: lesSpin 1.25s linear infinite; }
+.les-horn i { position: absolute; top: 4px; width: 110px; height: 22px; background: linear-gradient(90deg, #333, #aaa); border-radius: 4px 50% 50% 4px; }
+.les-horn i:first-child { left: 110px; }
+.les-horn i:last-child { left: 0; transform: scaleX(-1); background: linear-gradient(90deg, #333, #555); }
+.les-drum { position: absolute; left: 25px; right: 25px; top: 20px; bottom: 20px; border-radius: 50% / 18%;
+  background: repeating-linear-gradient(90deg, #2a2a30 0 18px, #5a5a62 18px 22px, #2a2a30 22px 60px, #888 60px 64px); background-size: 120px 100%; animation: lesDrum 1.5s linear infinite reverse; }
+.leslie.fast .les-horn { animation-duration: .15s; }
+.leslie.fast .les-drum { animation-duration: .18s; }
+.leslie.stop .les-horn, .leslie.stop .les-drum { animation-play-state: paused; }
+@keyframes lesSpin { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+@keyframes lesDrum { from { background-position: 0 0; } to { background-position: 120px 0; } }
+
+.ep-stage { --cc: #ff4fd8; }
+.prig-win .rig-status { max-width: 430px; }
+.prig-body.rig-synth, .prig-body.rig-fx { display: block; }
+.prig-body.rig-env { flex-direction: column; align-items: stretch; }
+.prig-body .fx-grid { align-items: start; }

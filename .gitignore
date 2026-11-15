@@ -1,0 +1,46 @@
+# =====================================================================
+#  ScoreDAW — files that must NOT go to GitHub
+# =====================================================================
+
+# Sounds built from the Ableton Live Core Library and the FL Studio factory
+# content: commercial libraries, not redistributable. Everyone builds their own
+# with "Build Sound Packs.cmd" (tools/build_sound_packs.py) from their own copy.
+sounds/index.js
+sounds/packs/
+sounds/_cache/
+
+# Build output of ScoreDAW for Windows (publish the .exe in GitHub -> Releases)
+desktop/host/bin/
+desktop/host/obj/
+desktop/dist/
+desktop/engine/build/
+*.pdb
+
+# Original source archives (already converted into samples/ — links in CREDITS.md)
+tools/guitar-lab/*.7z
+tools/*/*.7z
+
+# Personal state of the labs
+tools/guitar-lab/guitar-lab-state*.json
+
+# Editors / system
+.vs/
+.vscode/
+*.user
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Additional local build output and personal lab exports
+/desktop/build-engine/
+**/CMakeFiles/
+**/CMakeCache.txt
+*.pyc
+__pycache__/
+/tools/guitar-lab/guitar-references*.json
+**/references/*
+!**/references/README.md
+
+# Guitar Pro reference library (copyrighted transcriptions — analysed locally, never uploaded)
+Canciones re derefencias/
+tools/style-analysis/out/

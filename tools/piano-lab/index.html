@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!--
+  ScoreDAW — PIANO LAB
+  Stand-alone test bench for the realistic keyboard engines:
+  grand piano · electric piano · synthesizer · organ.
+  Open this file in Chrome or Edge (double-click "Open Piano Lab.cmd").
+  Files: presets.js (data) · sampler.js (real recordings) · engine.js (models + effects)
+         app.js (interface) · style.css · samples/ + packs/ (recordings)
+  Saved references → "Save references…" writes piano-references.json (put it in references/).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Piano Lab — ScoreDAW</title>
+  <link rel="icon" href="../../assets/scoredaw-icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top glass">
+    <div class="brand">
+      <img src="../../assets/scoredaw-icon.svg" alt="" onerror="this.style.display='none'">
+      <div><b>PIANO LAB</b><small>ScoreDAW · realistic keyboard engines · test bench</small></div>
+    </div>
+    <div class="transport" id="transport"></div>
+    <div class="top-right">
+      <label class="scale">UI <input type="range" id="uiScale" min="0.7" max="1.4" step="0.05"><span id="uiScaleVal"></span></label>
+      <button class="btn" id="btnHelp" title="How to use the lab">?</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- left: instruments, sounds, variants, references -->
+    <aside class="col left">
+      <section class="glass card"><h3>Instrument</h3><div id="typeList" class="guitar-list"></div></section>
+      <section class="glass card"><h3>Sounds <small>(starting points)</small></h3><div id="soundBox" class="sound-list"></div></section>
+      <section class="glass card"><h3>Variants <small>(compare A / B / C / D)</small></h3><div id="slotBox"></div></section>
+      <section class="glass card"><h3>⭐ Reference for ScoreDAW</h3><div id="refBox"></div></section>
+      <section class="glass card"><h3>📚 Saved experiments</h3><div id="libBox"></div></section>
+    </aside>
+
+    <!-- centre: keyboard, drawbars, analyser -->
+    <section class="col center">
+      <div class="glass card">
+        <h3>Keyboard <small>click a key (lower = louder) · drag = glissando · computer keys A W S E D … · <span id="nowPlaying"></span></small></h3>
+        <div class="kb-wrap"><div id="keyboard" class="kb"></div></div>
+        <div class="kb-bar" id="kbBar"></div>
+      </div>
+      <div class="glass card" id="drawbarCard" hidden>
+        <h3>Drawbars <small>pull down = louder · brown: sub + fifth · white: octaves · black: other harmonics</small></h3>
+        <div id="drawbars" class="drawbars"></div>
+      </div>
+      <div class="glass card grow">
+        <h3>Analyser <small id="anInfo"></small></h3>
+        <div class="an-wrap">
+          <canvas id="spectrum"></canvas>
+          <div class="an-side">
+            <canvas id="scope"></canvas>
+            <div class="meter"><div id="meterBar"></div></div>
+            <button class="btn small" id="btnHold" title="Freeze the current spectrum as a dashed curve to compare">📌 Hold curve</button>
+            <button class="btn small" id="btnClearHold">Clear</button>
+            <hr>
+            <b class="mini">Real instrument reference</b>
+            <input type="file" id="refFile" accept="audio/*" hidden>
+            <button class="btn small" id="btnRefLoad">📂 Load recording…</button>
+            <button class="btn small" id="btnRefPlay" disabled>▶ Play recording</button>
+            <small id="refName" class="muted">Load a recording of a real instrument to compare by ear and on the analyser.</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- right: settings -->
+    <aside class="col right glass">
+      <div class="set-head">
+        <h3 id="setTitle">Settings</h3>
+        <input type="search" id="setSearch" placeholder="Filter settings…">
+      </div>
+      <div id="settings" class="settings"></div>
+    </aside>
+  </main>
+
+  <footer class="status glass" id="status"></footer>
+  <div id="toast" class="toast"></div>
+  <div id="startOverlay" class="overlay">
+    <div class="glass dialog">
+      <h2>🎹 Piano Lab</h2>
+      <p>Grand piano, electric piano, synthesizer and organ engines for ScoreDAW. Tune every setting, compare variants and save the best one of each instrument as the <b>reference</b> that ScoreDAW will use.</p>
+      <button class="btn primary big" id="btnStart">▶ Start audio</button>
+    </div>
+  </div>
+
+  <script src="presets.js"></script>
+  <script src="packs/index.js" onerror="void 0"></script>
+  <script src="sampler.js"></script>
+  <script src="engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

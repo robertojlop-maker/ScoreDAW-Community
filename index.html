@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<!--
+  =============================================================================
+   LEMON SCORE STUDIO — main window
+   -----------------------------------------------------------------------------
+   DAW + score editor + guitar tab editor in one program.
+   Layout (7 fixed zones):
+     1. Top bar ........ logo, menus, file, transport, tempo/key/meter, Simple/Pro
+     2. Library ........ left panel, drag & drop sounds / rhythms / progressions
+     3. Arrange ........ center top, the whole song (tracks over time)
+     4. Input strip .... center, fretboard / piano / chord builder (foldable)
+     5. Editor ......... center bottom, Pattern | Piano Roll | Score | Tab | Score+Tab | Mixer
+     6. Inspector ...... right panel, sound slot, articulations, techniques, pedalboard
+     7. Help bar ....... bottom, contextual help for the control under the mouse
+   Open this file in Chrome / Edge. In the desktop version it runs inside WebView2.
+  =============================================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ScoreDAW</title>
+  <link rel="icon" type="image/svg+xml" href="assets/scoredaw-icon.svg">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/guitarrig.css">
+  <link rel="stylesheet" href="css/pianorig.css">
+  <link rel="stylesheet" href="css/windrig.css">
+  <link rel="stylesheet" href="css/recstudio.css">
+</head>
+<body class="mode-pro">
+
+<div id="viewport">
+<div id="app">
+
+  <!-- ===================================================== 1. TOP BAR === -->
+  <header id="topbar" class="glass">
+    <div class="brand" data-help="ScoreDAW — DAW, score and guitar tab editor in one program.">
+      <div class="logo"><img src="assets/scoredaw-icon.svg" width="44" height="44" alt="ScoreDAW"></div>
+      <div class="brand-text">
+        <div class="brand-name">Score<span>DAW</span></div>
+        <div class="brand-tag">Compose · Arrange · Score · Tab · Play</div>
+      </div>
+    </div>
+
+    <nav class="menubar" id="menubar"><!-- built by app.js --></nav>
+
+    <div class="tb-group file-group">
+      <button class="icon-btn" id="btnNew" data-help="New project (Ctrl+N). Opens the welcome screen.">＋</button>
+      <button class="icon-btn" id="btnOpen" data-help="Open a project file (.lss.json) — Ctrl+O">📂</button>
+      <button class="icon-btn" id="btnSave" data-help="Save the project to a file — Ctrl+S">💾</button>
+      <button class="icon-btn" id="btnUndo" data-help="Undo — Ctrl+Z">↶</button>
+      <button class="icon-btn" id="btnRedo" data-help="Redo — Ctrl+Y">↷</button>
+      <input type="file" id="fileOpen" accept=".json,.lss" hidden>
+    </div>
+
+    <div class="tb-group transport" id="transport">
+      <button class="tr-btn" id="btnHome" data-help="Go to the start of the song (Home)">⏮</button>
+      <button class="tr-btn play" id="btnPlay" data-help="Play / Pause — Space">▶</button>
+      <button class="tr-btn" id="btnStop" data-help="Stop and return to the start position">■</button>
+      <button class="tr-btn rec" id="btnRec" data-help="Record — R. While playing, notes you play on the PC keyboard, piano, fretboard or MIDI keyboard are recorded on the selected track.">●</button>
+      <button class="tr-btn loop on" id="btnLoop" data-help="Loop the song or the selected section — L">⟳</button>
+      <button class="tr-btn mode" id="btnPatMode" data-help="SONG = play the whole song. PAT = loop only the selected pattern (to build beats and riffs) — P">SONG</button>
+    </div>
+
+    <div class="lcd" id="lcd" data-help="Song position: minutes:seconds and Bar.Beat.Sixteenth">
+      <div class="lcd-time" id="lcdTime">00:00.000</div>
+      <div class="lcd-bars" id="lcdBars">Bar 1.1.1</div>
+    </div>
+
+    <div class="tb-group params">
+      <label class="param" data-help="Tempo in beats per minute. Drag up/down or type a value.">
+        <span>Tempo</span>
+        <input type="number" id="inTempo" min="30" max="300" step="1" value="120">
+      </label>
+      <label class="param" data-help="Key of the song. Used by the scale overlay, chord buttons and generators.">
+        <span>Key</span>
+        <div class="inline">
+          <select id="inKey"></select>
+          <select id="inScale"><option value="major">Major</option><option value="minor">Minor</option></select>
+        </div>
+      </label>
+      <label class="param" data-help="Time signature (beats per bar): 2/4 3/4 4/4 5/4 6/8 7/8 9/8 12/8. The generators (Auto Generate) write in 4/4.">
+        <span>Time Sig.</span>
+        <select id="inMeter"></select>
+      </label>
+      <button class="toggle-btn" id="btnMetronome" data-help="Metronome on/off — M">
+        <span class="tg-ico">𝅘𝅥𝅮</span>
+      </button>
+    </div>
+
+    <div class="tb-group mode-switch" data-help="Simple mode shows only the essential controls. Pro mode shows everything. Your project is the same in both modes.">
+      <button id="btnSimple">Simple</button>
+      <button id="btnPro" class="active">Pro</button>
+    </div>
+
+    <div class="tb-group right-tools">
+      <div class="scale-ctl" data-help="Interface size. Auto fits the window; − / + changes the size (Ctrl − / Ctrl +, Ctrl 0 = Auto).">
+        <button class="icon-btn small" id="btnScaleDown">−</button>
+        <span id="scaleLabel">Auto</span>
+        <button class="icon-btn small" id="btnScaleUp">+</button>
+      </div>
+      <button class="icon-btn" id="btnSettings" data-help="Settings: audio and MIDI devices, library folders, interface — Ctrl+,">⚙</button>
+      <button class="icon-btn" id="btnHelp" data-help="Help and keyboard shortcuts — F1">?</button>
+    </div>
+  </header>
+
+  <!-- ======================================================== MAIN ===== -->
+  <main id="main">
+
+    <!-- ================================================ 2. LIBRARY ===== -->
+    <aside id="library" class="glass panel side-panel">
+      <!-- collapsed strip (shown when the panel is retracted) -->
+      <div class="side-strip" id="libStrip" data-help="Open the Library (Alt+1)"><span class="strip-ico">📚</span><span class="strip-text">Library</span><span class="strip-ico">▸</span></div>
+      <div class="side-resize right" id="libResize" data-help="Drag to change the width of the Library"></div>
+      <div class="panel-head">
+        <h2>Library</h2>
+        <button class="chip-btn" id="libFavToggle" data-help="Show only your favorites (★)">★ Favorites</button>
+        <button class="collapse-btn" id="btnLibCollapse" data-help="Retract the Library to a thin strip (Alt+1)">◂</button>
+      </div>
+      <div class="search">
+        <input type="search" id="libSearch" placeholder="Search sounds, rhythms, chords…" data-help="Search the whole library by name, genre or instrument">
+      </div>
+      <div class="lib-tabs" id="libTabs"><!-- built by library.js --></div>
+      <div class="lib-list" id="libList"><!-- built by library.js --></div>
+      <div class="lib-footer" id="libFooter" data-help="Drag any item from the library and drop it on a track, a pattern, the mixer or the score. Neon outlines show where you can drop it."></div>
+    </aside>
+
+    <!-- ================================================= CENTER ======== -->
+    <section id="center">
+
+      <!-- 3. ARRANGE -->
+      <div id="arrangePanel" class="glass panel">
+        <div class="panel-toolbar">
+          <button class="fold-btn" id="btnFoldArrange" data-help="Fold / unfold the Song / Arrange panel (Alt+2)">▾</button>
+          <div class="tabs big">
+            <button class="tab active" data-help="Song / Arrange: the whole song — tracks, sections and patterns over time.">Song / Arrange</button>
+          </div>
+          <button class="btn primary" id="btnAddTrack" data-help="Add a new track (guitar, bass, keys, strings, synth or drums)">＋ Add Track</button>
+          <button class="btn ag-btn" id="btnAutoGen" data-help="Auto Generate Track (Ctrl+G): analyzes the song (key, chords, bass, groove, sections) and writes a melody, harmony, bass or drum part for the selected track in the chosen genre — bar by bar, as editable patterns">✨ Auto Generate Track</button>
+          <button class="btn ag-btn ag-full" id="btnAutoSong" data-help="Auto Generate Full Song (Ctrl+Shift+G): creates a complete song of a genre (salsa, merengue, bachata, rock, blues, jazz…) in your key — instruments, rhythm, harmony and melodies of the genre">🎼 Auto Generate Full Song</button>
+          <button class="btn rs-btn" id="btnRecStudio" data-help="Recording Studio: record from a microphone, guitar or any input of the PC (selectable), edit the take (cut, add, fades…) and insert it into the song where you choose">🎙 Record Audio</button>
+          <div class="spacer"></div>
+          <label class="mini-param pro-only" data-help="Zoom of the arrange view">Zoom
+            <input type="range" id="arrZoom" min="3" max="16" step="1" value="7">
+          </label>
+        </div>
+        <div class="arr-scroll" id="arrScroll"><!-- built by arrange.js --></div>
+      </div>
+      <div class="vsplit" id="split1" data-help="Drag to change the height of the Song / Arrange panel. Double-click = default size."></div>
+
+      <!-- 4. INPUT STRIP -->
+      <div id="inputStrip" class="glass panel">
+        <div class="panel-toolbar">
+          <button class="fold-btn" id="btnFoldInput" data-help="Fold / unfold the Input panel (Alt+3)">▾</button>
+          <h3>Input</h3>
+          <div class="tabs" id="inputTabs">
+            <button class="tab active" data-input="fretboard" data-help="Guitar fretboard: click a fret to write a note. Shift+click adds notes to the same chord.">🎸 Fretboard</button>
+            <button class="tab" data-input="piano" data-help="Piano: click keys or use the PC keyboard (Z…M and Q…U rows). [ and ] change octave.">🎹 Piano</button>
+            <button class="tab" data-input="chords" data-help="Chord Builder: pick a root and a type, see the guitar and piano shapes, insert with one click.">♯ Chords</button>
+          </div>
+          <div class="sep"></div>
+          <button class="toggle-btn on" id="btnWrite" data-help="Step input ON: notes you click or play are written at the cursor of the selected track. OFF: only listen.">✎ Write</button>
+          <div class="dur-palette" id="durPalette" data-help="Note duration used when writing notes"></div>
+          <div class="spacer"></div>
+          <div id="inputOptions" class="input-options"><!-- per-input options --></div>
+        </div>
+        <div class="input-body" id="inputBody">
+          <canvas id="fretCanvas"></canvas>
+          <div id="pianoWrap" class="hidden"></div>
+          <div id="chordWrap" class="hidden"></div>
+        </div>
+      </div>
+
+      <div class="vsplit" id="split2" data-help="Drag to change the height of the Input panel. Double-click = default size."></div>
+
+      <!-- 5. EDITOR -->
+      <div id="editorPanel" class="glass panel">
+        <div class="panel-toolbar">
+          <button class="fold-btn" id="btnFoldEditor" data-help="Fold / unfold the Editor panel (Alt+4)">▾</button>
+          <div class="tabs big" id="editorTabs">
+            <button class="tab" data-view="pattern" data-help="Pattern (F2): step sequencer for drums and percussion">▦ Pattern</button>
+            <button class="tab" data-view="pianoroll" data-help="Piano Roll (F3): edit notes, length and velocity">▤ Piano Roll</button>
+            <button class="tab" data-view="score" data-help="Score (F4): standard notation">𝄞 Score</button>
+            <button class="tab" data-view="tab" data-help="Tab (F5): guitar / bass tablature with techniques">𝄚 Tab</button>
+            <button class="tab active" data-view="scoretab" data-help="Score + Tab (F6): notation and tablature linked, like Guitar Pro">𝄞𝄚 Score + Tab</button>
+            <button class="tab" data-view="mixer" data-help="Mixer (F7): volume, pan, effects and sends for every track">🎚 Mixer</button>
+            <button class="tab" data-view="instrument" data-help="Instrument / Generator (F8): edit the sound generator of the selected track (synth oscillators, filter, envelopes, sampler…)">🎛 Generator</button>
+          </div>
+          <div id="editorMini"><!-- pattern-only transport --></div>
+          <div class="spacer"></div>
+          <div class="editor-tools" id="editorTools"><!-- per-view tools --></div>
+        </div>
+        <div class="editor-body" id="editorBody">
+          <div class="view" id="view-pattern"></div>
+          <div class="view" id="view-pianoroll"><canvas id="prCanvas"></canvas></div>
+          <div class="view notation-view" id="view-notation"><div class="paper" id="paper"></div></div>
+          <div class="view" id="view-mixer"></div>
+          <div class="view" id="view-instrument"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== 6. INSPECTOR ===== -->
+    <aside id="inspector" class="glass panel side-panel">
+      <div class="side-strip" id="inspStrip" data-help="Open the Inspector (Alt+5)"><span class="strip-ico">◂</span><span class="strip-text">Inspector</span><span class="strip-ico">🎛️</span></div>
+      <div class="side-resize left" id="inspResize" data-help="Drag to change the width of the Inspector"></div>
+      <div class="panel-head">
+        <button class="collapse-btn" id="btnInspCollapse" data-help="Retract the Inspector to a thin strip (Alt+5)">▸</button>
+        <h2>Inspector</h2>
+      </div>
+      <div class="insp-body" id="inspBody"><!-- built by inspector.js --></div>
+    </aside>
+  </main>
+
+  <!-- ================================================ 7. HELP BAR ===== -->
+  <footer id="helpbar" class="glass">
+    <button class="help-pill" id="btnHelp2" data-help="Open help and shortcuts — F1">? Help</button>
+    <div class="help-text" id="helpText"><b>Tip:</b> move the mouse over any control to see what it does.</div>
+    <div class="status" id="statusBar">
+      <span id="statusEngine" data-help="The audio engine runs in the browser (Web Audio). Real samples come from your own sound folders or the optional sound packs you build locally.">Engine: Preview (Web Audio)</span>
+      <span id="statusRate"></span>
+    </div>
+  </footer>
+
+  <!-- ================================================= OVERLAYS ===== -->
+  <div id="modalRoot"></div>
+  <div id="ctxMenu" class="ctx-menu hidden"></div>
+  <div id="toast" class="toast"></div>
+
+</div>
+</div>
+
+<!-- Scripts (plain scripts, no build step needed) -->
+<script src="js/config.js"></script>
+<script src="js/util.js"></script>
+<script src="js/pedals.js"></script>
+<script src="js/model.js"></script>
+<script src="js/audio.js"></script>
+<!-- Guitar Rig: the Guitar Lab engine (tools/guitar-lab) — gl-base.js tells it where its files are -->
+<script src="js/gl-base.js"></script>
+<script src="tools/guitar-lab/presets.js"></script>
+<script src="tools/guitar-lab/packs/index.js" onerror="void 0"></script>
+<script src="tools/guitar-lab/sampler.js"></script>
+<script src="tools/guitar-lab/engine.js"></script>
+<script src="js/guitarrig.js"></script>
+<!-- Piano Rig: the Piano Lab engine (tools/piano-lab) — pl-base.js tells it where its files are -->
+<script src="js/pl-base.js"></script>
+<script src="tools/piano-lab/presets.js"></script>
+<script src="tools/piano-lab/packs/index.js" onerror="void 0"></script>
+<script src="tools/piano-lab/sampler.js"></script>
+<script src="tools/piano-lab/engine.js"></script>
+<script src="js/pianorig.js"></script>
+<!-- Wind Rig: the Wind Lab engine (tools/wind-lab) — wl-base.js tells it where its files are -->
+<script src="js/wl-base.js"></script>
+<script src="tools/wind-lab/presets.js"></script>
+<script src="tools/wind-lab/packs/index.js" onerror="void 0"></script>
+<script src="tools/wind-lab/engine.js"></script>
+<script src="js/windrig.js"></script>
+<script src="js/samples.js"></script>
+<script src="js/factory.js"></script>
+<script src="sounds/index.js" onerror="void 0"></script>
+<script src="js/views/library.js"></script>
+<script src="js/views/arrange.js"></script>
+<script src="js/views/input.js"></script>
+<script src="js/views/pattern.js"></script>
+<script src="js/views/pianoroll.js"></script>
+<script src="js/views/notation.js"></script>
+<script src="js/views/mixer.js"></script>
+<script src="js/views/inspector.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/generators.js"></script>
+<script src="js/autogen.js"></script>
+<script src="js/styles.js"></script>
+<script src="js/bands.js"></script>
+<script src="js/styledata.js"></script>
+<script src="js/legends.js"></script>
+<script src="js/songgen.js"></script>
+<script src="js/vocals.js"></script>
+<script src="js/export.js"></script>
+<script src="js/midiout.js"></script>
+<script src="js/recorder.js"></script>
+<script src="js/recstudio.js"></script>
+<script src="js/desktop.js"></script>
+<script src="js/views/instrument.js"></script>
+<script src="js/views/guitarrig-panel.js"></script>
+<script src="js/views/rig-ui.js"></script>
+<script src="js/views/pianorig-panel.js"></script>
+<script src="js/views/windrig-panel.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
