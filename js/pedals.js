@@ -251,6 +251,7 @@
       lfo.connect(g1); g1.connect(d1.delayTime);
       lfo.connect(g2); g2.connect(d2.delayTime);
       lfo.start();
+      st.lfos = [lfo];
       st.in.connect(dry); dry.connect(st.out);
       st.in.connect(d1); d1.connect(pan1); pan1.connect(wet);
       st.in.connect(d2); d2.connect(pan2); pan2.connect(wet);
@@ -269,6 +270,7 @@
       const d = ctx.createDelay(4), fb = ctx.createGain(), f = ctx.createBiquadFilter(); f.type = 'lowpass';
       const sat = ctx.createWaveShaper(); sat.curve = clipCurve('soft', 1.5);
       const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.7; lfo.connect(lg); lg.connect(d.delayTime); lfo.start();
+      st.lfos = [lfo];
       st.in.connect(dry); dry.connect(st.out);
       st.in.connect(d); d.connect(f); f.connect(sat); sat.connect(fb); fb.connect(d);
       sat.connect(wet); wet.connect(st.out);
@@ -294,6 +296,12 @@
         wet.gain.value = s.mix * 1.2; dry.gain.value = 1;
       };
     }
+    /** the track was deleted: take the stage out of the graph and stop its oscillators */
+    st.dispose = () => {
+      try { st.in.disconnect(); } catch (e) { /* not connected */ }
+      try { st.out.disconnect(); } catch (e) { /* not connected */ }
+      (st.lfos || []).forEach(o => { try { o.stop(); o.disconnect(); } catch (e) { /* stopped */ } });
+    };
     return st;
   };
 

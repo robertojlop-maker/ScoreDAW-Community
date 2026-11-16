@@ -62,6 +62,8 @@
           if (m.type === 'params') this.P = m.p;
           else if (m.type === 'events') this.enqueue(m.list);
           else if (m.type === 'panic') { this.q.length = 0; this.v.length = 0; this.ped = 0; this.soft = 0; this.org.keys.clear(); this.org.dirty = true; }
+          // dispose: end the processor (a disconnected worklet node would keep running forever)
+          else if (m.type === 'dispose') { this.dead = true; this.q.length = 0; this.v.length = 0; }
         };
       }
       enqueue(list) {
@@ -465,6 +467,7 @@
         } else if (P.model === 'organ') this.organRender(L, R, i0, i1);
       }
       process(inputs, outputs) {
+        if (this.dead) return false;
         const L = outputs[0][0], R = outputs[0][1] || L, n = L.length, f0 = currentFrame;
         if (this.tmp.length < n) this.tmp = new Float32Array(n);
         let i0 = 0;
@@ -741,8 +744,18 @@
     }
     dispose() {
       try { this.stop(); } catch (e) { /* closed */ }
+      try { this.node.port.postMessage({ type: 'dispose' }); } catch (e) { /* closed */ }      // end the worklet processor
       [this.n.analyser, this.node, this.sampler.out].forEach(x => { try { x.disconnect(); } catch (e) { /* not connected */ } });
       ['tLfo', 'phLfo', 'chLfo'].forEach(k => { try { this.n[k].stop(); } catch (e) { /* stopped */ } });
+      const n = this.n;
+      // take EVERY node of the engine out of the graph: an AnalyserNode without an output is still
+      // processed by the browser, and with it the whole effect chain that feeds it (compressors,
+      // reverbs, delays) — for ever, for every deleted track and every replaced song
+      Object.keys(n).forEach(k => [].concat(n[k]).forEach(x => {
+        if (!x || typeof x.disconnect !== 'function') return;
+        try { x.disconnect(); } catch (e) { /* not connected */ }
+        if (typeof x.stop === 'function') { try { x.stop(); } catch (e) { /* not started / stopped */ } }
+      }));
     }
   }
   PL.Engine = Engine;

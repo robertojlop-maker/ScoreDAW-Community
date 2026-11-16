@@ -24,6 +24,8 @@ class GLNamProcessor extends AudioWorkletProcessor {
         modulePromise = modulePromise || createNamEngine({ wasmBinary: r.wasmBytes, locateFile: p => p });
         this.module = await modulePromise;
         this.id = this.module._nam_createInstance(sampleRate, QUANTUM);
+        this.made = true;
+        if (this.dead) { this.free(); this.respond(r.requestId, false, { error: 'disposed' }); return; }
         this.ptr = this.module._nam_getBuffer(this.id);
         this.respond(r.requestId, true);
       } else if (r.type === 'load-model') {
@@ -34,12 +36,20 @@ class GLNamProcessor extends AudioWorkletProcessor {
         if (!ok) throw new Error(M.UTF8ToString(M._nam_getLastError()) || 'model load failed');
         this.view = null; this.hasModel = true; this.fade = FADE_IN;
         this.respond(r.requestId, true, { loudness: M._nam_hasLoudness(this.id) ? M._nam_getLoudness(this.id) : null, rate: M._nam_getExpectedSampleRate(this.id) });
+      } else if (r.type === 'dispose') {
+        // the track was deleted / the song replaced: stop processing for good and free the amp network
+        this.dead = true; this.hasModel = false; this.free();
       } else if (r.type === 'unload-model') {
         this.module._nam_unloadModel(this.id); this.hasModel = false; this.respond(r.requestId, true);
       }
     } catch (err) {
       this.respond(r.requestId, false, { error: err && err.message ? err.message : String(err) });
     }
+  }
+  free() {
+    if (!this.made || !this.module) return;
+    this.made = false; this.view = null;
+    try { this.module._nam_destroyInstance(this.id); } catch (e) { /* already gone */ }
   }
   process(inputs, outputs) {
     if (this.dead) return false;

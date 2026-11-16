@@ -200,8 +200,23 @@
     if (SDAW.pianoRig) SDAW.pianoRig.remove(id);
     if (SDAW.windRig) SDAW.windRig.remove(id);
     const ch = A.chains[id]; if (!ch) return;
-    try { ch.analyser.disconnect(); ch.rev.disconnect(); ch.dly.disconnect(); } catch (e) { /* ignore */ }
+    // every node of the chain leaves the graph (before, the chain of a deleted track stayed connected
+    // to the master with its pedals and oscillators running)
+    [ch.input, ch.vol, ch.pan, ch.analyser, ch.rev, ch.dly].forEach(n => { try { n.disconnect(); } catch (e) { /* not connected */ } });
+    PEDAL_ORDER.forEach(k => { const s = ch.stages[k]; if (s && s.dispose) s.dispose(); });
     delete A.chains[id];
+    delete A.lastPitch[id];
+  };
+  /**
+   * Remove the chains (and Guitar / Piano / Wind Rig engines) of tracks that are no longer in the song.
+   * Loading or generating another song replaces every track: without this, the audio graph of the
+   * previous songs kept running and the sound broke up or disappeared after a few songs.
+   * Ids starting with '__' are the library previews (they are reused).
+   */
+  A.pruneChains = function () {
+    if (!A.ctx || A.offline) return;
+    const ids = new Set(SDAW.store.song.tracks.map(t => t.id));
+    Object.keys(A.chains).forEach(id => { if (!ids.has(id) && id.indexOf('__') !== 0) A.removeTrack(id); });
   };
 
   /* ======================================================== ENGINES === */
@@ -482,7 +497,7 @@
         const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = f * mul;
         const pg = c.createGain(); pg.gain.value = g;
         if (!sustain && mul > 1) { pg.gain.setValueAtTime(g, time); pg.gain.exponentialRampToValueAtTime(g * 0.1, time + 0.6 / mul + 0.2); }
-        o.connect(pg); pg.connect(out); o.start(time); o.stop(time + dur + 0.4);
+        o.connect(pg); pg.connect(out); o.start(time); o.stop(time + dur + 0.4); keep(o, time + dur + 0.4);
       });
       return;
     }
@@ -493,7 +508,7 @@
       lpf.connect(out);
       [-7, 0, 7].forEach(det => {
         const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det;
-        o.connect(lpf); o.start(time); o.stop(time + dur + 0.7);
+        o.connect(lpf); o.start(time); o.stop(time + dur + 0.7); keep(o, time + dur + 0.7);
       });
       return;
     }
@@ -504,7 +519,7 @@
     const cut = params.cutoff || 2500;
     lpf.frequency.setValueAtTime(cut * 2, time); lpf.frequency.exponentialRampToValueAtTime(Math.max(200, cut * 0.4), time + 0.3);
     o.connect(lpf); lpf.connect(env(ch.input, time, 0.18 * vel, 0.005, Math.max(0, dur - 0.05), 0.15));
-    o.start(time); o.stop(time + dur + 0.2);
+    o.start(time); o.stop(time + dur + 0.2); keep(o, time + dur + 0.2);
   }
 
   /** Synthesized drum kit */
@@ -661,7 +676,19 @@
     }
     A.index = idx;
   };
-  SDAW.bus.on('change', () => { if (A.ctx && !A.offline) { A.rebuildIndex(); A.updateDelayTime(); SDAW.store.song.tracks.forEach(t => A.updateTrack(t)); } });
+  SDAW.bus.on('change', () => { if (A.ctx && !A.offline) { A.pruneChains(); A.rebuildIndex(); A.updateDelayTime(); SDAW.store.song.tracks.forEach(t => A.updateTrack(t)); } });
+
+  /**
+   * One event that cannot be played (a note with a broken pitch / length / velocity, a missing
+   * pattern…) must not stop the song: before, the error left the scheduler on the same tick for
+   * ever and every track went silent. The event is skipped, reported once, and the song goes on.
+   */
+  A.eventErrors = 0;
+  A.eventError = function (err, ev) {
+    A.eventErrors++;
+    if (A.eventErrors <= 5) console.warn('ScoreDAW audio: event skipped', ev && ev.track && ev.track.name, ev && (ev.note || ev.drum || ev.audio), err);
+    if (A.eventErrors === 1 && SDAW.toast && !A.offline) SDAW.toast('⚠ A note of "' + ((ev && ev.track && ev.track.name) || 'a track') + '" could not be played and was skipped (' + (err && err.message || err) + ')');
+  };
 
   function tickDur() { return 60 / SDAW.store.song.tempo / CONFIG.grid.ticksPerBeat; }
 
@@ -828,9 +855,9 @@
 
   /** Play every event of one tick at a given context time */
   function dispatch(tick, at, td, anySolo, DYN) {
-      applyAutomation(tick, at, anySolo, false);
+      try { applyAutomation(tick, at, anySolo, false); } catch (err) { A.eventError(err, null); }
       const evs = A.index[tick] || [];
-      evs.forEach(ev => {
+      evs.forEach(ev => { try {
         const t = ev.track;
         if (t.mute || (anySolo && !t.solo)) return;
         const time = at + ((ev.frac || 0) + swingShift(tick, ev.frac || 0)) * td;
@@ -852,7 +879,7 @@
           } else playMelodic(t, n.pitch, time + Math.max(0, hum), dur, { vel, tech, prevPitch: A.lastPitch[t.id], strumIndex: ev.strumIndex, string: n.string, fret: n.fret, tick: tick + (ev.frac || 0) });
           A.lastPitch[t.id] = n.pitch;
         }
-      });
+      } catch (err) { A.eventError(err, ev); } });
   }
 
   /* ================================================== OFFLINE RENDER === *
@@ -1002,7 +1029,7 @@
         SDAW.bus.emit('transport', { playing: false, preparing: true });
         if (SDAW.toast) SDAW.toast('⏳ Loading the real instruments (' + waits.length + ' track' + (waits.length > 1 ? 's' : '') + ')… the song starts when they are ready');
         const limit = new Promise(r => setTimeout(r, (CONFIG.audio.prepareTimeoutSec || 20) * 1000));
-        Promise.race([Promise.all(waits), limit]).then(() => {
+        Promise.race([Promise.all(waits).catch(() => null), limit]).then(() => {
           if (A.prepId !== id || !A.preparing) return;          // Stop was pressed meanwhile
           A.preparing = false;
           A.play(fromTick, { noWait: true });
@@ -1011,6 +1038,7 @@
       }
     }
     A.runId = (A.runId || 0) + 1;
+    A.eventErrors = 0;
     clearTimeout(A.endTimer); A.endTimer = null;
     A.rebuildIndex();
     buildSequence();

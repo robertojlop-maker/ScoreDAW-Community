@@ -309,7 +309,10 @@
     if (!r.dest) { const ch = SDAW.audio.getChain(track); r.out.connect(ch.input); r.dest = ch.input; }
     // Library previews wait for the real recordings (so the preview sounds like the track will)
     const waitLib = track.id.startsWith('__') && r.libState === 'loading';
-    if (!r.eng || waitLib) { if (!r.err && r.queue.length < 400) r.queue.push([track, pitch, time, dur, opts]); return true; }
+    // the engine could not start (r.err): say so to audio.js, which plays the note with the light built-in
+    // engine — before, the note was swallowed here and the track stayed silent
+    if (!r.eng && r.err) return false;
+    if (!r.eng || waitLib) { if (r.queue.length < 400) r.queue.push([track, pitch, time, dur, opts]); return true; }
     flushPending(r, time - 0.001);                    // every off before this note goes first (time order)
     r.eng.send(noteEvents(r, pitch, time, dur, opts || {}));
     r.lastNote = Math.max(r.lastNote, time + dur);

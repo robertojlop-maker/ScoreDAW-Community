@@ -114,12 +114,13 @@
     const c = A.ctx;
     const P = Object.assign(SDAW.deepCopy(SDAW.GEN_DEFAULT), (track.params && track.params.gen) || {});
     const tech = opts.tech || {}, T = track.technique || {};
+    const leadVoice = (P.preset === 'Lead Vocal' || P.preset === 'Female Vocal') && !!SDAW.FORMANTS[P.formant];
     const vel = (opts.vel || 100) / 127;
     const end = time + Math.max(dur, P.a + 0.01);
     const stopAt = end + P.r * 2.5 + 0.05;
 
     // amplitude envelope (ADSR)
-    const amp = c.createGain(), peak = 0.2 * vel * (P.gain || 0.8);
+    const amp = c.createGain(), peak = 0.2 * vel * (P.gain || 0.8) * (leadVoice ? 1.5 : 1);
     amp.gain.setValueAtTime(0.0001, time);
     amp.gain.linearRampToValueAtTime(peak, time + P.a);
     amp.gain.setTargetAtTime(Math.max(0.0001, peak * P.s), time + P.a, Math.max(0.005, P.d / 3));
@@ -133,13 +134,20 @@
     flt.frequency.setTargetAtTime(Math.max(40, cut * (0.4 + 0.6 * P.s)), time + P.a, Math.max(0.01, P.d / 3));
     if (P.formant && SDAW.FORMANTS[P.formant]) {
       // voice: the filtered tone goes through the vowel's formant resonances (+ a little dry)
-      const fsum = c.createGain(); fsum.gain.value = 2.2;
+      const fsum = c.createGain(); fsum.gain.value = leadVoice ? 3.0 : 2.2;
+      const articulation = Math.min(0.11, dur * 0.45);
       SDAW.FORMANTS[P.formant].forEach(([f, g]) => {
-        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = f / 90;
+        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = f / (leadVoice ? 155 : 90);
+        if (leadVoice) {
+          // An opening vowel moves the resonances during the note attack.
+          bp.frequency.setValueAtTime(f * 0.78, time);
+          bp.frequency.linearRampToValueAtTime(f, time + articulation);
+          bp.frequency.setTargetAtTime(f * 0.96, time + articulation, 0.12);
+        }
         const bg = c.createGain(); bg.gain.value = g;
         flt.connect(bp); bp.connect(bg); bg.connect(fsum);
       });
-      const dry = c.createGain(); dry.gain.value = 0.12; flt.connect(dry); dry.connect(fsum);
+      const dry = c.createGain(); dry.gain.value = leadVoice ? 0.05 : 0.12; flt.connect(dry); dry.connect(fsum);
       fsum.connect(amp);
     } else flt.connect(amp);
     amp.connect(dest);
@@ -160,6 +168,10 @@
         detuneTargets.push({ p: src.detune, base: o.det || 0 });
       }
       const g = c.createGain(); g.gain.value = o.vol;
+      if (leadVoice && o.wave === 'noise') {
+        g.gain.setValueAtTime(o.vol * 3, time);
+        g.gain.setTargetAtTime(o.vol * 0.7, time + Math.min(0.03, dur * 0.2), 0.025);
+      }
       src.connect(g); g.connect(flt);
       src.start(time); src.stop(stopAt);
       oscs.push(src);

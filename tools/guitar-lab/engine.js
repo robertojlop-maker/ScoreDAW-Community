@@ -302,7 +302,12 @@
         this.port.onmessage = (m) => {
           const d = m.data;
           if (d.type === 'params') { Object.assign(this.P, d.p); this.applyParams(); }
-          else if (d.type === 'evs') d.list.forEach(e => this.push(e));
+          else if (d.type === 'evs') { this.asleep = false; d.list.forEach(e => this.push(e)); }
+          // sleep / wake: an idle engine skips its 6 string models; dispose: the processor ends for good
+          // (a worklet node keeps running even when it is disconnected, so it must be told to stop)
+          else if (d.type === 'sleep') this.asleep = true;
+          else if (d.type === 'wake') this.asleep = false;
+          else if (d.type === 'dispose') { this.dead = true; this.q = []; this.sq = []; }
           else if (d.type === 'stop') this.stopAll();
           else if (d.type === 'panic') { this.q = []; this.sq = []; this.st.forEach(s => { s.reset(); s.noteId = 0; }); }
         };
@@ -406,6 +411,8 @@
         }
       }
       process(inputs, outputs) {
+        if (this.dead) return false;                               // disposed: the browser may free the processor
+        if (this.asleep && !this.q.length) return true;            // sleeping: silence (the output is already zero)
         const out = outputs[0], L = out[0], R = out[1] || out[0], n = L.length;
         const P = this.P, st = this.st, el = !!P.electric;
         this.block(currentFrame, n);
@@ -889,7 +896,10 @@
       const ctx = this.ctx, n = this.n;
       const job = (async () => {
         if (!this.namNode) {
-          this.namNode = await GL.createNamNode(ctx);
+          const made = await GL.createNamNode(ctx);
+          // the track was deleted / the song replaced while the amp was loading: end the new processor at once
+          if (this.disposed) { try { made.port.postMessage({ type: 'dispose' }); made.disconnect(); } catch (e) { /* closed */ } return; }
+          this.namNode = made;
           if (!this.asleep) n.namIn.connect(this.namNode);
           this.namNode.connect(n.namOut);
         }
@@ -931,20 +941,37 @@
      */
     sleep() {
       if (this.asleep) return; this.asleep = true;
+      try { this.node.port.postMessage({ type: 'sleep' }); } catch (e) { /* closed */ }
       try { this.node.disconnect(); } catch (e) { /* not connected */ }
       try { if (this.namNode) this.n.namIn.disconnect(this.namNode); } catch (e) { /* not connected */ }
     }
     wake() {
       if (!this.asleep) return; this.asleep = false;
+      try { this.node.port.postMessage({ type: 'wake' }); } catch (e) { /* closed */ }
       this.node.connect(this.n.modelGain);
       if (this.namNode) this.n.namIn.connect(this.namNode);
     }
     /** Disconnect everything (the track was deleted / changed engine) */
     dispose() {
       const n = this.n;
+      this.disposed = true;
       try { this.stop(); } catch (e) { /* context closed */ }
-      [n.analyser, this.node, this.namNode, this.sampler.out].forEach(x => { try { if (x) x.disconnect(); } catch (e) { /* not connected */ } });
+      // END the worklet processors: disconnecting is not enough, a disconnected AudioWorkletNode keeps
+      // being processed (6 string models + the neural amp, forever) and every deleted track / replaced
+      // song would add to the audio load until the sound breaks up
+      try { this.node.port.postMessage({ type: 'dispose' }); } catch (e) { /* closed */ }
+      try { if (this.namNode) { this.namNode.port.postMessage({ type: 'dispose' }); n.namIn.disconnect(); } } catch (e) { /* closed */ }
+      this.namTok = (this.namTok || 0) + 1;
+      [n.analyser, n.lim, n.out, this.node, this.namNode, this.sampler.out].forEach(x => { try { if (x) x.disconnect(); } catch (e) { /* not connected */ } });
       ['lfoL', 'lfoR'].forEach(k => { try { n[k].stop(); } catch (e) { /* stopped */ } });
+      // take EVERY node of the engine out of the graph: an AnalyserNode without an output is still
+      // processed by the browser, and with it the whole effect chain that feeds it (compressors,
+      // reverbs, delays) — for ever, for every deleted track and every replaced song
+      Object.keys(n).forEach(k => [].concat(n[k]).forEach(x => {
+        if (!x || typeof x.disconnect !== 'function') return;
+        try { x.disconnect(); } catch (e) { /* not connected */ }
+        if (typeof x.stop === 'function') { try { x.stop(); } catch (e) { /* not started / stopped */ } }
+      }));
       this.disposed = true;
     }
   }
@@ -985,7 +1012,7 @@
    *  from packs: they are joined into ONE module (no import) and given as a data: URL. */
   let namURL = null;
   async function namWorkletURL() {
-    if (!GL.fromDisk()) return GL.asset('nam/nam-worklet.js');
+    if (!GL.fromDisk()) return GL.asset('nam/nam-worklet.js') + '?v=20261116';   // version: the browser must not reuse an older cached copy
     if (!namURL) {
       const eng = (await GL.loadAsset('nam/nam-engine.js', 'text')).replace(/export\s+default\s+createNamEngine\s*;?\s*$/, '');
       const wk = (await GL.loadAsset('nam/nam-worklet.js', 'text')).replace(/^\s*import\s+createNamEngine\s+from\s+['"][^'"]+['"];?\s*$/m, '');

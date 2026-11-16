@@ -116,7 +116,7 @@
     'Reggae Skank (Spring)': { amp: { on: true, model: 'twin', gain: 0.3 }, eq: { on: true, model: 'graphic', low: -6, mid: 2, high: 3 }, reverb: { on: true, model: 'spring', mix: 0.25 } },
     'Dub Delay': { delay: { on: true, model: 'tape', time: 2, feedback: 0.5, mix: 0.3 }, reverb: { on: true, model: 'plate', mix: 0.25 } },
     'Funk (Comp + Clean)': { comp: { on: true, model: 'dyna', amount: 0.6 }, amp: { on: true, model: 'twin', gain: 0.3 }, reverb: { on: true, model: 'room', mix: 0.12 } },
-    'Vocal Plate': { comp: { on: true, model: 'studio', amount: 0.5 }, eq: { on: true, model: 'tilt', low: -3, mid: 1, high: 2 }, delay: { on: true, model: 'digital', time: 2, feedback: 0.2, mix: 0.12 }, reverb: { on: true, model: 'plate', mix: 0.26 } },
+    'Vocal Plate': { comp: { on: true, model: 'studio', amount: 0.5 }, eq: { on: true, model: 'tilt', low: -3, mid: 1, high: 2 }, delay: { on: true, model: 'digital', time: 2, feedback: 0.2, mix: 0.07 }, reverb: { on: true, model: 'plate', mix: 0.15 } },
     'Choir Hall': { comp: { on: true, model: 'studio', amount: 0.35 }, eq: { on: true, model: 'tilt', low: -4, mid: 0, high: 1 }, reverb: { on: true, model: 'hall', mix: 0.38 } },
     'Synth Wide': { chorus: { on: true, model: 'dimension', mix: 0.4 }, delay: { on: true, model: 'digital', time: 2, feedback: 0.25, mix: 0.18 }, reverb: { on: true, model: 'plate', mix: 0.25 } }
   };
@@ -991,7 +991,7 @@
     const gender = opts.voice === 'male' || opts.voice === 'female' ? opts.voice : sv.gender || (R.next() < (SG.MALE_LEAN[opts.genre] || 0.5) ? 'male' : 'female');
     let voices = opts.choir === 'none' ? 0 : opts.choir === 2 || opts.choir === '2' ? 2 : opts.choir === 3 || opts.choir === '3' ? 3 : sv.voices !== undefined ? sv.voices : R.pick([2, 2, 3]);
     let choirMode = voices ? V.chooseChoir(opts.genre, opts.seed || 1) : null;
-    const singer = { id: 'vox', name: 'Lead Vocal', role: 'vocal', inst: gender === 'female' ? 'Female Vocal' : 'Lead Vocal', vol: 0.82, pan: 0, fx: 'Vocal Plate',
+    const singer = { id: 'vox', name: 'Lead Vocal', role: 'vocal', inst: gender === 'female' ? 'Female Vocal' : 'Lead Vocal', vol: 0.9, pan: 0, fx: 'Vocal Plate',
       range: (sv.range && sv.gender === gender ? sv.range : V.ranges[gender]).slice(), in: { intro: 0, solo: 0 } };
     const choir = [];
     const pans = [-0.4, 0.4, 0];
@@ -1152,7 +1152,14 @@
     try {
       const specs = st.tracks.filter(t => (trackOpts[t.id] || {}).on);
       specs.forEach(sp => { const o = trackOpts[sp.id]; const t = SG.makeTrackFor(Object.assign({}, sp, { fxChoice: o.fx, guitarEngine: opts.guitarEngine || 'rig' }), o.inst); t.play = o.play || sp.play || null; song.tracks.push(t); });
-      if (plan) [plan.singer].concat(plan.choir).forEach(sp => { specs.push(sp); song.tracks.push(SG.makeTrackFor(sp, sp.inst)); });
+      if (plan) {
+        // Leave headroom for the lead vocal in newly generated sung arrangements.
+        song.tracks.forEach(t => { t.vol = Math.round(t.vol * 0.75 * 100) / 100; });
+        [plan.singer].concat(plan.choir).forEach(sp => {
+          specs.push(sp);
+          song.tracks.push(SG.makeTrackFor(sp, sp.inst));
+        });
+      }
       const vox = plan ? song.tracks.find(x => x.styleTrack === 'vox') : null;
       const order = ['drums', 'bass', 'harmony', 'strum', 'arp', 'vocal', 'choir', 'melody', 'horns', 'counter', 'horn2'];
       const sorted = specs.slice().sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role));
@@ -1181,7 +1188,8 @@
     const s = SDAW.store;
     const song = SG.createSong(opts);
     s.beginEdit();
-    if (SDAW.app?.loadNewSong) SDAW.app.loadNewSong(song, true); else s.load(song, true);
+    // Use the same transport reset as opening a project (loop, pattern mode and pending playback).
+    if (SDAW.app?.loadSong) SDAW.app.loadSong(song, true); else s.load(song, true);
     const v = song.vocals, CH = { harmony: 'harmonies', oohs: 'oohs', call: 'coro (call & response)', hook: 'gang hook' };
     const vx = v ? ' · ' + (v.gender === 'female' ? 'female' : 'male') + ' singer' + (v.voices ? ' + ' + v.voices + '-voice ' + CH[v.choir] : '') : '';
     const hero = SDAW.legends && SDAW.legends.lastHero ? ' · lead guitar in the style of ' + SDAW.legends.lastHero : '';

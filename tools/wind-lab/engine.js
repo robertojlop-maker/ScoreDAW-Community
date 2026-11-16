@@ -504,6 +504,15 @@
     dispose() {
       try { this.stop(); } catch (e) { /* closed */ }
       try { this.n.analyser.disconnect(); } catch (e) { /* gone */ }
+      const n = this.n;
+      // take EVERY node of the engine out of the graph: an AnalyserNode without an output is still
+      // processed by the browser, and with it the whole effect chain that feeds it (compressors,
+      // reverbs, delays) — for ever, for every deleted track and every replaced song
+      Object.keys(n).forEach(k => [].concat(n[k]).forEach(x => {
+        if (!x || typeof x.disconnect !== 'function') return;
+        try { x.disconnect(); } catch (e) { /* not connected */ }
+        if (typeof x.stop === 'function') { try { x.stop(); } catch (e) { /* not started / stopped */ } }
+      }));
     }
   }
   WL.Engine = Engine;

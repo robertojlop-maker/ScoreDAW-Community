@@ -570,6 +570,95 @@
     ]
   };
 
+  // Shared vocabulary for the traditional blues engine and the guitarist presets.
+  function addBluesPhrases(ctx, sec, bars, isLastSection) {
+    const { an } = ctx;
+    const key = an.key.root, tun = CONFIG.guitar.tuning, frets = CONFIG.guitar.frets;
+    const dominant = mod12(key + 7);
+    const at = (bar, beat = 0) => an.chordAt((sec.start + bar) * BAR + beat);
+    const isRoot = (bar, tick, root) => at(bar, tick)?.root === root;
+    const tonicSpan = (bar, start, end) => isRoot(bar, start, key) && isRoot(bar, end - 1, key);
+    const nearest = notes => notes.sort((a, b) => Math.abs(a - ctx.center) - Math.abs(b - ctx.center))[0];
+    const [lo, hi] = ctx.range;
+    const roots = [];
+    for (let p = lo; p <= hi; p++) if (mod12(p) === key) roots.push(p);
+
+    function replace(k, start, end, phrase) {
+      const bar = bars[k];
+      if (!bar?.notes.length || !phrase.length || phrase.some(n => !n)) return;
+      bar.notes = bar.notes.filter(n => n.start < start || n.start >= end);
+      bar.notes.forEach(n => { if (n.start < start) n.dur = Math.min(n.dur, start - n.start); });
+      bar.notes.push(...phrase);
+      bar.notes.sort((a, b) => a.start - b.start || a.pitch - b.pitch);
+    }
+
+    function note(start, dur, pitch, tech = {}, position = SDAW.autoFret(pitch, new Set(), 7)) {
+      if (!position) return null;
+      return { start, dur, pitch, tech, string: position.string, fret: position.fret,
+        vel: Math.round(clamp((ctx.baseVel || 90) + (start % 4 === 0 ? 5 : -3), 35, 122)) };
+    }
+    const fixed = (start, dur, string, fret, tech) =>
+      note(start, dur, tun[string] + fret, tech, { string, fret });
+
+    // A blue third (the second degree of the minor pentatonic) answers on I.
+    const curlBar = sec.length >= 8 ? 2 : 1;
+    if (tonicSpan(curlBar, 8, BAR)) {
+      const root = nearest(roots.filter(p => p + 3 <= hi));
+      if (root !== undefined) {
+        const bend = ctx.mel?.bends === false ? {} : { bend: 0.5, bendType: 'up' };
+        replace(curlBar, 8, BAR, [note(8, 2, root + 3, bend), note(10, 5, root)]);
+      }
+    }
+
+    // Descending sixths on strings 3 and 1. In A, frets 9/9, 8/8, 7/7, 6/5.
+    // Resolve the lower voice to the actual third of the tonic chord.
+    if (sec.length >= 8 && tonicSpan(6, 8, BAR) && tun[5] - tun[3] === 9) {
+      const tonicChord = at(6, 8);
+      const thirdFretOffset = tonicChord.pcs.includes(mod12(key + 4)) ? 1 : 0;
+      const root = nearest(roots.filter(p => p >= tun[5] && p - 9 >= lo && p + 4 <= Math.min(hi, tun[5] + frets)));
+      if (root !== undefined) {
+        const f = root - tun[5];
+        const together = ((sec.occ || 0) + (sec.type === 'solo' ? 1 : 0)) % 2 === 0;
+        const phrase = [];
+        [4, 3, 2, 1].forEach((offset, i) => {
+          const t = 8 + i * 2;
+          phrase.push(fixed(t, together ? 1.75 : 0.9, 3, f + (i === 3 ? thirdFretOffset : offset)));
+          phrase.push(fixed(t + (together ? 0 : 1), together ? 1.75 : 0.9, 5, f + (i === 3 ? 0 : offset)));
+        });
+        replace(6, 8, BAR, phrase);
+      }
+    }
+
+    const allowsDownbeat = ctx.play !== 'answers' && ctx.level !== 0.5;
+    const turnRoot = nearest(roots.filter(p => p - 5 >= Math.max(lo, tun[0])));
+    if (turnRoot === undefined || sec.length < 2) return;
+    const final = sec.length - 1, penultimate = final - 1;
+    const closing = isLastSection && isRoot(final, 0, key) && isRoot(final, 15, key);
+
+    // Check the actual harmony. Some progressions put V on the second half
+    // of the last bar, or use IV at the end of the penultimate bar.
+    const turnBar = !closing && tonicSpan(final, 0, 8) && isRoot(final, 8, dominant) ? final : penultimate;
+    const halfBar = turnBar === final || !tonicSpan(turnBar, 0, BAR);
+    if (tonicSpan(turnBar, 0, halfBar ? 8 : BAR) &&
+        (closing || isRoot(final, halfBar ? 8 : 0, dominant) || isRoot(final, 0, dominant))) {
+      const offsets = [0, -2, -3, -4, -5];
+      const starts = halfBar ? [0, 2, 3, 4, 6] : [8, 10, 11, 12, 14];
+      if (!halfBar || allowsDownbeat) {
+        const phrase = starts.map((t, i) => note(t, i === 4 ? 1.75 : Math.min(1.75, starts[i + 1] - t), turnRoot + offsets[i]));
+        replace(turnBar, starts[0], starts[0] + 8, phrase);
+      }
+    }
+    if (closing && allowsDownbeat) {
+      replace(final, 0, BAR, [note(0, BAR, turnRoot, ctx.mel?.vibrato === false ? { ring: true } : { ring: true, vib: true })]);
+    } else if (sec.start >= 2 && allowsDownbeat && isRoot(0, 0, key) && isRoot(-1, 15, dominant)
+      && (isRoot(-1, 0, key) || isRoot(-2, 0, key))) {
+      const next = bars[0].notes.find(n => n.start > 0)?.start ?? 4;
+      replace(0, 0, Math.min(next, 4), [note(0, Math.min(next, 4), turnRoot)]);
+    }
+  }
+
+
+
   function bluesLeadSection(ctx, sec, isLastSection) {
     const { an, opts } = ctx;
     const mel = ctx.mel || {};
@@ -615,7 +704,7 @@
         else if (tc.includes('b2')) { tech.bend = 2; tech.bendType = 'up'; }
         else if (tc.includes('b1')) { tech.bend = 1; tech.bendType = 'up'; }
         else if (tc.includes('c') && major) { tech.bend = 0.5; tech.bendType = 'up'; }   // curl: b3 a quarter tone sharp
-        if (!mel.bends && tech.bend && tech.bend >= 1) { delete tech.bend; delete tech.bendType; }
+        if (!mel.bends && tech.bend) { delete tech.bend; delete tech.bendType; }
         if (tc.includes('v') && mel.vibrato !== false) tech.vib = true;
         if (tc.includes('h') && gtr) tech.h = true;
         if (tc.includes('p') && !tc.includes('pb') && gtr) tech.p = true;
@@ -1683,6 +1772,9 @@
           const playWas = ctx.play;
           if (ctx.leadMode === 'riff' && !(SDAW.legends && SDAW.legends.heroFor(ctx) && track.type === 'guitar')) ctx.play = 'riffs';   // non-guitar leads: 2-bar riffs
           bars = melodySection(ctx, secG, isLast);
+          if (role === 'melody' && track.type === 'guitar' && style?.melody?.licks === 'blues' && ctx.mel?.licks !== false) {
+            addBluesPhrases(ctx, secG, bars, isLast);
+          }
           ctx.play = playWas;
         }
         else if (role === 'harmony') bars = harmonySection(ctx, sec);
