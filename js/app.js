@@ -631,6 +631,7 @@
   }
 
   /* ===================================================== ANIMATION ===== */
+  let lastHeavyPlaybackFrame = 0;
   function frame() {
     const tick = SDAW.audio.getTick();
     updateLcd(tick);
@@ -638,7 +639,9 @@
     if (app.view === 'pattern') SDAW.pattern.updatePlayhead(tick);
     if (app.view === 'mixer') SDAW.mixer.updateMeters();
     if ((app.view === 'score' || app.view === 'tab' || app.view === 'scoretab')) SDAW.notation.updatePlayhead(tick);
-    if (SDAW.audio.playing) {
+    const frameTime = performance.now();
+    if (SDAW.audio.playing && frameTime - lastHeavyPlaybackFrame >= 50) {
+      lastHeavyPlaybackFrame = frameTime;
       if (app.view === 'pianoroll') SDAW.pianoroll.render();
       if (SDAW.input.mode === 'fretboard') SDAW.input.drawFretboard();
     }

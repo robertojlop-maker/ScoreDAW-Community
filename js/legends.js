@@ -399,7 +399,7 @@
       }
       const tech = {};
       if (i === 0 && (o.si || R.chance(h.slide * 0.6))) tech.slide = 'inBelow';
-      if (d >= 4 && R.chance(h.bend * (last ? 0.7 : 0.35))) {
+      if (S.bends && d >= 4 && R.chance(h.bend * (last ? 0.7 : 0.35))) {
         const below = sc[Math.max(0, nearIdx(sc, p - 1.5))], k = p - below;
         if (k >= 1 && k <= 2) { S.emit(t, d, below, Object.assign({ bend: k, bendType: 'up' }, last && d >= 6 ? vibOf(S) : {})); prevP = p; return; }
       }
@@ -416,7 +416,7 @@
     if (o.root) { const kl = ladder([S.key], S.lo, S.hi); target = kl[nearIdx(kl, Math.max(S.p, S.center - 6))] || target; }
     const tech = {};
     let pitch = target;
-    if (o.bend && R.chance(0.35 + h.bend * 0.65)) {
+    if (S.bends && o.bend && R.chance(0.35 + h.bend * 0.65)) {
       const sc = lad(S, T, 'scale');
       let i = nearIdx(sc, target); if (sc[i] >= target) i--;
       if (o.wide && i > 0 && target - sc[i] < 3) i--;                       // from two scale steps below (1½ – 2 tones)
@@ -515,6 +515,7 @@
   };
   /** unison bend: the G string bent a whole tone up to the note held on the B string */
   G.uni = function (S, T, len) {
+    if (!S.bends) return G.hold(S, T, len, {});
     const tun = TUN();
     let target = ctNear(S, T, Math.max(S.p, S.center + 4));
     while (target - tun[4] < 5) target += 12;
@@ -554,7 +555,7 @@
       // pedal-steel bend: the lower note bends a whole tone up into a chord tone under a held note
       const target = ctNear(S, T, S.center + (o.high ? 6 : 0)), l = ctLad(S, T), j = l.findIndex(x => x > target + 2);
       const upper = j >= 0 ? l[j] : target + 5, d = Math.min(len, 8);
-      S.emit(T, d, target - 2, { bend: 2, bendType: 'up' }, { acc: 6 }); S.emit(T, d, upper, {}, { acc: 2 });
+      S.emit(T, d, S.bends ? target - 2 : target, S.bends ? { bend: 2, bendType: 'up' } : {}, { acc: 6 }); S.emit(T, d, upper, {}, { acc: 2 });
       S.p = target;
       if (len > d) G.run(S, T + d, len - d, { dir: -1 });
       return;
@@ -649,7 +650,7 @@
   G.rake = function (S, T, len) {
     const target = ctNear(S, T, S.p + 2), l = ctLad(S, T), i = nearIdx(l, target);
     [2, 1].forEach((back, k) => { if (k < len - 1 && l[i - back] !== undefined) S.emit(T + k * 0.5, 0.5, l[i - back], { mute: true }, { acc: -25 }); });
-    S.emit(T + 1, Math.max(1, len - 1), target - 2, { bend: 2, bendType: 'up', accent: true }, { acc: 6 });
+    S.emit(T + 1, Math.max(1, len - 1), S.bends ? target - 2 : target, S.bends ? { bend: 2, bendType: 'up', accent: true } : { accent: true }, { acc: 6 });
     S.p = target;
   };
   /** melodic arpeggio of the chord in 8ths (o.pull: quick pull-off ornaments) */
@@ -688,12 +689,12 @@
       if (S.minor) { const m = mod12(semi); if (m === 4) semi -= 1; else if (m === 9) semi += 1; }      // minor key: 3rd → b3, 6th → b7
       const tech = {};
       const m = /b(\d)(r?)/.exec(tc);
-      if (/pb/.test(tc)) { tech.bend = 2; tech.bendType = 'prerelease'; }
-      else if (m) { tech.bend = +m[1]; tech.bendType = m[2] ? 'release' : 'up'; }
+      if (S.bends && /pb/.test(tc)) { tech.bend = 2; tech.bendType = 'prerelease'; }
+      else if (S.bends && m) { tech.bend = +m[1]; tech.bendType = m[2] ? 'release' : 'up'; }
       let rest = tc.replace(/pb|b\dr?/g, '');
       if (/si/.test(rest)) { tech.slide = 'inBelow'; rest = rest.replace('si', ''); }
       if (/so/.test(rest)) { tech.slide = 'outDown'; rest = rest.replace('so', ''); }
-      if (rest.includes('c') && !S.minor) { tech.bend = 0.5; tech.bendType = 'up'; }
+      if (S.bends && rest.includes('c') && !S.minor) { tech.bend = 0.5; tech.bendType = 'up'; }
       if (rest.includes('w')) tech.wvib = true; else if (rest.includes('v')) tech.vib = true;
       if (rest.includes('h')) tech.h = true;
       if (rest.includes('p')) tech.p = true;
@@ -739,7 +740,7 @@
   /** a lick / cell technique string → ScoreDAW techniques */
   function techOf(S, tc) {
     const tech = {}, m = /b(\d)/.exec(tc || '');
-    if (m) { tech.bend = +m[1]; tech.bendType = 'up'; }
+    if (S.bends && m) { tech.bend = +m[1]; tech.bendType = 'up'; }
     if (/si/.test(tc)) tech.slide = 'inBelow';
     if (/h/.test(tc)) tech.h = true;
     if (/(^|[^s])p/.test(tc)) tech.p = true;
@@ -812,7 +813,7 @@
         if (lastNote && d >= 2) p = ctNear(S, t, p);
         const tech = {}, dg = String(mod12(p - S.key));
         let pitch = p;
-        if (d >= 1 && R.chance(Math.min(0.85, (bd[dg] || 0) * (d >= 2 ? 1.8 : 0.7)))) {
+        if (S.bends && d >= 1 && R.chance(Math.min(0.85, (bd[dg] || 0) * (d >= 2 ? 1.8 : 0.7)))) {
           // bend into the note from the scale note below (1 or 2 semitones, like the data)
           const j = nearIdx(sc, p - 1.5), below = sc[Math.max(0, j)], k = p - below;
           if (k >= 1 && k <= 2) { pitch = below; tech.bend = k; tech.bendType = 'up'; }
@@ -842,6 +843,7 @@
     return best === null ? 5 + mod12(S.key - tun[5] - 5) : best;
   }
   G.dsb = function (S, T, len, o) {
+    if (!S.bends) return G.ds(S, T, len, {});
     const tun = TUN(), F = boxFret(S), R = S.R, kind = o.kind || R.pick(['gbe', 'be', 'oblique', 'stack']);
     const trip = o.trip !== undefined ? !!o.trip : ((SDAW.store.song && SDAW.store.song.swing > 0.3) || R.chance(0.5));
     const at = (s, f) => ({ string: s, fret: f, pitch: tun[s] + f });
@@ -962,7 +964,8 @@
     const center = clamp(ctx.center + prof.lift + (solo ? 3 : 0) + 4, lo + 9, hi - 12);      // lead guitar: the singing register (around the 8th – 15th fret)
     const kl = ladder([an.key.root], lo, hi), tonic = kl[nearIdx(kl, center - 2)];
     const song = SDAW.store.song || {};
-    const S = { ctx, an, R, hero, sec, lo, hi, center, key: an.key.root, minor: an.key.mode === 'minor', tonic, p: center, notes: [], motifs: {}, tempo: song.tempo || 110,
+    const jazz = ctx.opts.genre === 'Jazz' || ctx.style?.melody?.licks === 'jazz';
+    const S = { ctx, an, R, hero, sec, lo, hi, center, bends: !jazz || ctx.mel?.bends === true, key: an.key.root, minor: an.key.mode === 'minor', tonic, p: center, notes: [], motifs: {}, tempo: song.tempo || 110,
       emit(T, d, pitch, tech, x) { if (d > 0.01) this.notes.push(Object.assign({ T, d, pitch, tech: tech || {} }, x || {})); } };
     const cx = ctx.opts.complexity === undefined ? 0.5 : ctx.opts.complexity;
     const hot = solo || sec.type === 'chorus';
@@ -1003,6 +1006,7 @@
         const calm = sec.type === 'intro' || sec.type === 'outro';
         if (b === 0) play([['mel', 16, { motif: sec.type + 'A', slow: calm ? 1 : 0 }]], k);
         else if (b === 1) play(calm ? [['hold', 12, { bend: 1 }], ['rest', 4]] : [['mel', 16, { motif: sec.type + 'A', vary: 1 }]], k);
+        else if (lastBar && id === 'joepass' && sec.type === 'intro' && ctx.mel?.harmonics) play([['hold', 12, {}], ['harm', 4, {}]], k);
         else if (b === 2) play(hot && cx > 0.55 && ln % 2 === 1 ? sig() : [['mel', 16, { motif: sec.type + 'B' }]], k);
         else play(hot ? [['hold', 8, { bend: 1 }]].concat(fill()) : (calm || hero.sparse ? [['hold', 12, {}], ['rest', 4]] : [['hold', 8, { bend: 1 }], ['rest', 2], ['mel', 6, {}]]), k);
       }

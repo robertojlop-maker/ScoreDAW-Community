@@ -429,6 +429,9 @@
     // ---- the note-off waits (a slide / hammer-on may continue the string)
     const off = { type: 'off', t: t + Math.max(0.02, dur), s: st, id: on.id, harm };
     r.pend.push(off);
+    // Pitch events belong to a note, even when another note later reuses its string.
+    before.forEach(e => { if (e.type === 'bend') e.id = L.id; });
+    after.forEach(e => { if (e.type === 'bend') e.id = on.id; });
     const lastBend = after.length ? after[after.length - 1].semis : 0;
     Object.assign(L, { t, t0: time, end: off.t, midi: on.midi, fret, id: on.id, bent: lastBend });
     return before.concat([on], after).sort((a, b) => a.t - b.t);

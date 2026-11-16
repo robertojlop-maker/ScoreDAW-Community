@@ -833,7 +833,13 @@
         const tech = {};
         if (R.chance(0.3) && mel.slides !== false) tech.slide = 'outDown'; else tech.vib = mel.vibrato !== false;
         if (R.chance(0.3) && mel.slides !== false && !tech.slide) tech.slide = 'inBelow';
-        add(t, Math.max(4, Math.min(8, pend - t + 2)), land, tech);
+        let pitch = land;
+        if (gtr && mel.bends && land > lo && !tech.slide && R.chance(0.3)) {
+          pitch--;
+          tech.bend = 1;
+          tech.bendType = 'up';
+        }
+        add(t, Math.max(4, Math.min(8, pend - t + 2)), pitch, tech);
         p = land;
         // space before the next phrase (more space when calm)
         t = pend + R.pick([2, 4, 6, 8, 10]) + (busy < 0.4 ? 4 : 0);
@@ -1096,7 +1102,7 @@
         if (s12 !== undefined) { n.pitch = tun[s12] + 12; n.string = s12; n.fret = 12; n.tech = { harm: true }; return; }
       }
       // bends into strong long notes
-      if ((mel.bends || (gtr && ctx.opts.techniques && !mel.any)) && n.dur >= 4 && Number.isInteger(n.start) && n.start % 4 === 0 && (hot || R.chance(0.3))) {
+      if ((mel.bends || (gtr && ctx.opts.techniques && !mel.any && ctx.style?.melody?.licks !== 'jazz' && ctx.opts.genre !== 'Jazz')) && n.dur >= 4 && Number.isInteger(n.start) && n.start % 4 === 0 && (hot || R.chance(0.3))) {
         const half = sc.includes(mod12(n.pitch - 1)) && !sc.includes(mod12(n.pitch - 2));
         const amt = half ? 1 : 2;
         if ((!gtr || (n.fret !== undefined && n.fret >= amt + 2)) && R.chance((hot ? 0.3 : 0.12) * (mel.bends ? 1.4 : 1))) {
@@ -1734,7 +1740,7 @@
 
   /* ================================================================ UI == */
 
-  AG.last = { style: null, play: '', melody: {}, role: 'auto', seed: 1, density: 0.5, complexity: 0.45, register: 0, mode: 'replace', link: true, varyRepeats: false, techniques: true, writeChords: true, writeSections: true, addOutro: false, addIntro: false, introRest: false };
+  AG.last = { style: null, play: '', melody: {}, role: 'auto', seed: 1, density: 1, complexity: 1, register: 0, mode: 'replace', link: true, varyRepeats: false, techniques: true, writeChords: true, writeSections: true, addOutro: false, addIntro: false, introRest: false };
 
   /** The Auto Generate dialog: analysis on the left, options on the right */
   AG.open = function () {
@@ -1744,9 +1750,9 @@
     const meter = AG.meterSupport(s.song);
     if (!meter.ok) return SDAW.toast(meter.text);
     // the last options, but a NEW idea every time the dialog opens (↺ brings the last one back)
-    const o = Object.assign({}, AG.last, { trackId: s.sel.trackId || s.song.tracks[0].id, seed: SDAW.songgen ? SDAW.songgen.newSeed() : 1 + Math.floor(Math.random() * 999999) });
+    const o = Object.assign({}, AG.last, { complexity: 1, density: 1, trackId: s.sel.trackId || s.song.tracks[0].id, seed: SDAW.songgen ? SDAW.songgen.newSeed() : 1 + Math.floor(Math.random() * 999999) });
     if (!o.style) o.style = s.song.style && SDAW.STYLES && SDAW.STYLES[s.song.style] ? s.song.style : 'Generic';
-    o.melody = Object.assign({}, o.melody);
+    o.melody = Object.assign({}, !AG.last.style && o.style === 'Jazz' ? SDAW.songgen.defaults('Jazz', o.seed).melody : o.melody);
     let an = null, chosen = null;
     const close = () => back.remove();
     const left = el('div', { class: 'ag-left' }), right = el('div', { class: 'ag-right' });
@@ -1809,7 +1815,12 @@
           .map(([v, l]) => el('option', { value: v, selected: o.role === v ? true : null }, v === 'auto' ? 'Auto → ' + (C.roles.find(r => r[0] === autoR) || ['', autoR])[1] : l))), 'Melody, counter-melody, harmony, strumming, arpeggio, bass or drums'));
       // genre: the accompaniment uses the real patterns of the genre, the melody its scales
       const styles = ['Generic'].concat(SDAW.STYLES ? Object.keys(SDAW.STYLES) : []);
-      right.appendChild(row('Genre', el('select', { onchange: e => { o.style = e.target.value; o.play = ''; renderRight(); } },
+      right.appendChild(row('Genre', el('select', { onchange: e => {
+        const genre = e.target.value;
+        if (genre === 'Jazz') o.melody = SDAW.songgen.defaults(genre, o.seed).melody;
+        else if (o.style === 'Jazz') o.melody = {};
+        o.style = genre; o.play = ''; renderRight();
+      } },
         styles.map(g => el('option', { value: g, selected: o.style === g ? true : null }, g === 'Generic' ? 'Generic (no genre)' : g))), 'Genre: rhythm patterns, voicings, bass lines and scales of that style'));
       const roleNow = o.role === 'auto' ? autoR : o.role;
       const PL = (SDAW.songgen && SDAW.songgen.PLAY_LABEL) || {};

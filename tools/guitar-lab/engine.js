@@ -360,6 +360,7 @@
           if (e.id && e.id !== s.noteId) return;
           s.dampTarget = 1; s.dampStep = 1 / (Math.max(0.005, P.releaseTime / 1000) * sr); s.vib = false; s.noteId = 0;
         } else if (e.type === 'bend') {
+          if (e.id && e.id !== s.noteId) return;
           s.bendTarget = e.semis; s.bendStep = Math.abs(e.semis - s.bend) / (Math.max(0.01, e.glide) * sr);
         }
       }

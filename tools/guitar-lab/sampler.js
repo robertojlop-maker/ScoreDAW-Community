@@ -211,7 +211,10 @@
       const prev = this.voices[e.s];
       // slide / hammer-on on a ringing string: re-pitch the same voice for slides
       if (e.legato && prev && prev.alive && e.glide > 0 && Math.abs(e.midi - prev.midi) <= 7) {
+        prev.src.detune.cancelScheduledValues(t);
         prev.src.detune.setValueAtTime(prev.cents, t);
+        prev.bent = 0;
+        this.byId.delete(prev.id);
         prev.cents += (e.midi - prev.midi) * 100;
         prev.src.detune.linearRampToValueAtTime(prev.cents, t + e.glide);
         prev.midi = e.midi; prev.id = e.id; this.byId.set(e.id, prev);
@@ -267,6 +270,7 @@
     /** delayed vibrato; mul = depth multiplier (wide vibrato ≈ 2) */
     vibrato(v, t, mul) {
       const P = this.P, ctx = this.ctx;
+      if (v.lfo) { try { v.lfo.stop(t); } catch (err) { /* already ended */ } }
       const lfo = ctx.createOscillator(), lg = ctx.createGain();
       lfo.frequency.value = P.vibRate; lg.gain.setValueAtTime(0, t);
       lg.gain.setValueAtTime(0, t + P.vibDelay);
@@ -288,7 +292,7 @@
     noteOff(e) {
       const v = this.byId.get(e.id); if (!v) return;
       this.byId.delete(e.id);
-      if (this.voices[v.s] !== v || !v.alive) return;
+      if (v.id !== e.id || this.voices[v.s] !== v || !v.alive) return;
       const P = this.P, t = Math.max(e.t, this.ctx.currentTime);
       const rel = Math.max(0.01, P.releaseTime / 1000);
       try {
@@ -310,7 +314,8 @@
       }
     }
     bend(e) {
-      const v = this.voices[e.s]; if (!v || !v.alive) return;
+      const v = e.id ? this.byId.get(e.id) : this.voices[e.s];
+      if (!v || !v.alive || (e.id && e.id !== v.id)) return;
       const t = Math.max(e.t, this.ctx.currentTime);
       v.src.detune.setValueAtTime(v.cents + (v.bent || 0) * 100, t);
       v.src.detune.linearRampToValueAtTime(v.cents + e.semis * 100, t + Math.max(0.01, e.glide));

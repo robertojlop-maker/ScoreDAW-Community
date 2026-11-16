@@ -777,17 +777,17 @@
       const mode = st.mode || 'major', tracks = {};
       st.tracks.forEach(t => { tracks[t.id] = { on: t.on !== false, inst: t.inst, play: t.play || null, fx: t.fx || 'Room' }; });
       const lead = st.tracks.find(t => t.lead) || {};
-      return { genre, songType: songType && base.types && base.types[songType] ? songType : 'auto', key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 0.6, density: 0.5, seed, progs: {}, tracks,
+      return { genre, songType: songType && base.types && base.types[songType] ? songType : 'auto', key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 1, density: 1, seed, progs: {}, tracks,
         vocals: st.vocal ? 'singer' : 'instrumental', voice: (st.vocal && st.vocal.gender) || 'auto', choir: st.vocal && st.vocal.voices !== undefined ? (st.vocal.voices ? String(st.vocal.voices) : 'none') : 'auto',
         leadPlan: Object.assign({}, st.leadPlan || {}),
-        melody: Object.assign({ complex: false, fast: false, triplets: false, modes: false, slides: false, harmonics: false, bends: false, vibrato: true, hero: 'auto' }, lead.mel || {}) };
+        melody: Object.assign({ complex: false, fast: false, triplets: false, modes: false, slides: false, harmonics: false, bends: false, vibrato: true, hero: st.melody?.heroes?.[0] || 'auto' }, lead.mel || {}) };
     }
     const mode = st.mode || 'major';
     const tracks = {};
     st.tracks.forEach(t => { tracks[t.id] = { on: t.on !== false, inst: t.inst, play: t.play || null, fx: t.fx || 'Room' }; });
     const lead = st.tracks.find(t => t.lead) || {};
-    return { genre, key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 0.5, density: 0.5, seed, progs: {}, tracks,
-      vocals: 'instrumental', voice: 'auto', choir: 'auto',
+    return { genre, key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 1, density: 1, seed, progs: {}, tracks,
+      vocals: 'instrumental', voice: 'auto', choir: 'auto', leadPlan: {},
       melody: Object.assign({ complex: false, fast: false, triplets: false, modes: false, slides: false, harmonics: false, bends: false, vibrato: true, hero: 'auto' }, lead.mel || {}) };
   };
 
@@ -1127,7 +1127,7 @@
     // the last idea or the recipe saved in the current song. From the welcome screen: the chosen genre.
     let o = init.genre && SDAW.STYLES[init.genre] ? SG.variedDefaults(init.genre)
       : SG.last && SDAW.STYLES[SG.last.genre] ? SDAW.deepCopy(SG.last) : SG.defaults(SDAW.store.song.style && SDAW.STYLES[SDAW.store.song.style] ? SDAW.store.song.style : 'Salsa');
-    o.seed = SG.newSeed();
+    Object.assign(o, { seed: SG.newSeed(), complexity: 1, density: 1 });
     if (!o.leadPlan) o.leadPlan = {};
     if (!o.extras) o.extras = [];
     if (!o.ending) o.ending = 'auto';
@@ -1149,6 +1149,11 @@
       Object.keys(families).forEach(f => {
         c1.appendChild(el('div', { class: 'sg-fam' }, f));
         c1.appendChild(el('div', { class: 'sg-genres' }, families[f].map(g => el('button', { class: 'sg-genre' + (g === o.genre ? ' active' : ''), onclick: () => {
+          if (g === 'Jazz') {
+            o = Object.assign(SG.defaults(g, o.seed), { structure: o.structure, extras: o.extras, complexity: o.complexity, density: o.density });
+            render();
+            return;
+          }
           if (SDAW.STYLES[g].band) { o = Object.assign(SG.variedDefaults(g, o.seed), { complexity: o.complexity, density: o.density, structure: o.structure, extras: o.extras, ending: 'auto' }); render(); return; }
           const keep = { seed: o.seed, complexity: o.complexity, density: o.density, structure: o.structure, vocals: o.vocals, voice: o.voice, choir: o.choir, leadPlan: o.leadPlan, extras: o.extras, ending: o.ending }; const ra = o.ref && SDAW.styleData && SDAW.styleData.artists[o.ref]; if (ra && ra.genres.includes(g)) keep.ref = o.ref; o = Object.assign(SG.defaults(g), keep); render(); } }, g))));
       });
@@ -1171,7 +1176,8 @@
         c1.appendChild(el('select', { class: 'sg-ref', onchange: e => {
           o.ref = e.target.value;
           const ra = o.ref && SDAW.styleData.artists[o.ref];
-          if (ra) { o.tempo = Math.max(40, Math.min(240, ra.tempo[2])); if (ra.minor >= 0.65) o.mode = 'minor'; else if (ra.minor <= 0.35) o.mode = 'major'; o.progs = {}; o.melody.hero = 'auto'; }
+          if (ra) { o.tempo = Math.max(40, Math.min(240, ra.tempo[2])); if (ra.minor >= 0.65) o.mode = 'minor'; else if (ra.minor <= 0.35) o.mode = 'major'; o.progs = {}; }
+          o.melody.hero = SDAW.legends?.HEROES[ra?.hero] ? ra.hero : SG.defaults(o.genre, o.seed).melody.hero;
           render(); } },
           [el('option', { value: '' }, 'None — the genre\'s own band')].concat(refs.map(r => el('option', { value: r.id, selected: o.ref === r.id ? true : null }, r.name + (r.fits ? ' ★' : '') + ' · ' + r.songs + ' songs')))));
         const ra = o.ref && SDAW.styleData.artists[o.ref];
@@ -1243,8 +1249,8 @@
 
       // lead guitar "in the style of" a great guitarist (legends.js)
       if (SDAW.legends) {
-        const st0 = SDAW.STYLES[o.genre], heroSel = el('select', { onchange: e => { o.melody.hero = e.target.value; render(); } },
-          SDAW.legends.options(st0).map(([v, l]) => el('option', { value: v, selected: (o.melody.hero || 'auto') === v ? true : null }, l)));
+        const heroSel = el('select', { onchange: e => { o.melody.hero = e.target.value; render(); } },
+          SDAW.legends.options(st).map(([v, l]) => el('option', { value: v, selected: (o.melody.hero || 'auto') === v ? true : null }, l)));
         c2.appendChild(el('div', { class: 'ag-sub' }, '🎸 Lead guitar in the style of'));
         c2.appendChild(heroSel);
         const hh = SDAW.legends.HEROES[o.melody.hero];

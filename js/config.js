@@ -137,7 +137,7 @@ window.CONFIG = {
     prepareTimeoutSec: 20,      // ▶ waits at most this long for real instruments that are still loading
     ceilingKnee: 0.89,          // master ceiling: the signal is untouched below this level (-1 dBFS)…
     ceiling: 0.985,             // …and never goes above this one (-0.13 dBFS): no clipping, live or exported
-    scheduleAheadSec: 0.12,  // how far ahead notes are scheduled
+    scheduleAheadSec: 0.25,  // how far ahead notes are scheduled
     metronome: false,
     metronomeVolume: 0.35,
     previewOnClick: true     // play a note when clicking the fretboard / piano

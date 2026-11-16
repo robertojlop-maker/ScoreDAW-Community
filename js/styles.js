@@ -201,7 +201,7 @@
       T('guitar', 'Rhythm Guitar', 'strum', 'Electric Guitar - Clean', { alt: 'guitar', on: false, play: 'joepass', plays: ['joepass', 'chords', 'arp'], fx: 'Jazz Clean', vol: 0.45, pan: 0.3,
         p: { chords: { verse: '0:2 4:2 8:2 12:2' } } }),
       // the lead: a hollow-body jazz guitar (Guitar Rig) — the head, then the solo, in the style of a jazz guitarist
-      T('lead', 'Jazz Guitar', 'melody', 'Electric Guitar - Lead', { alt: 'lead', fx: 'Jazz Clean', vol: 0.74, pan: 0.15, lead: true, mel: { triplets: true, slides: true, vibrato: true } }),
+      T('lead', 'Jazz Guitar', 'melody', 'Electric Guitar - Lead', { alt: 'lead', fx: 'Jazz Clean', vol: 0.74, pan: 0.15, lead: true, mel: { hero: 'joepass', complex: true, fast: true, triplets: true, modes: true, slides: true, harmonics: true, bends: false, vibrato: true } }),
       // horns (off): the sax doubles the head of the guitar an octave up / the trumpet joins it (hard-bop unison)
       T('sax', 'Tenor Sax', 'counter', 'Tenor Sax', { alt: 'lead', on: false, leadOf: 'lead', fx: 'Brass Room', vol: 0.55, pan: -0.2, range: [50, 80], in: IN('intro:0 solo:0') }),
       T('trumpet', 'Trumpet', 'counter', 'Trumpet', { alt: 'lead', on: false, leadOf: 'lead', fx: 'Brass Room', vol: 0.5, pan: -0.25, range: [58, 86], in: IN('intro:0 solo:0') })

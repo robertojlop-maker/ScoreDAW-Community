@@ -759,7 +759,13 @@
     const c = A.ctx, td = tickDur();
     const anySolo = SDAW.store.song.tracks.some(x => x.solo);
     const DYN = { ppp: 30, pp: 45, p: 60, mp: 75, mf: 90, f: 105, ff: 118, fff: 127 };
-    while (A.nextTime < c.currentTime + CONFIG.audio.scheduleAheadSec) {
+    // A stalled UI must not replay the missed interval as simultaneous notes.
+    // Continue from the next unscheduled tick with a fresh audio deadline.
+    if (A.nextTime < c.currentTime && !(A.endTimer && A.pos >= A.seq.end)) {
+      A.nextTime = c.currentTime + 0.03;
+    }
+    const horizon = c.currentTime + CONFIG.audio.scheduleAheadSec;
+    while (A.nextTime < horizon) {
       if (A.endTimer && A.pos >= A.seq.end) break;   // end already reached: nothing more to schedule (and don't push the stop timer later)
       const tick = seqTick(A.pos);
       A.tl.push([A.nextTime, tick]);

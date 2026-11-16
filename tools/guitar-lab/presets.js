@@ -462,7 +462,7 @@
   /* Version 8 Strat values made for the old, dull Strat recording */
   GL.V8_FACTORY = { strat: { sampleRestore: 0.8, samplePunch: 0.5 } };
   /** A fresh copy of the factory settings of a guitar type */
-  GL.factory = type => Object.assign({}, BASE, FACTORY[type] || {});
+  GL.factory = type => Object.assign({}, BASE, FACTORY[type] || {}, { squeak: 0 });
   /** Fill missing / invalid keys of a stored settings object (new params added later) */
   GL.sanitize = function (type, s) {
     const f = GL.factory(type), out = {};
