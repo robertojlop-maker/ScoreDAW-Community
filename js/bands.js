@@ -325,10 +325,20 @@
    * bars, rhythm "O.....O........." and "O.o.o.O.o.o.O.O."; lead: 23 % legato, 9 % tapping, 35 % triplets, harmonics
    * and whammy bar; drums: kick "X.......X.x.....", OPEN hi-hat in the verses; bass: root 8ths (86 %); synth lead
    * in 7 % of the songs with the rhythm "C.....n.....n..."; singer: pickups at the end of the bar in the verses,
-   * short shouted hooks in the chorus, high backing harmonies. */
+   * short shouted hooks in the chorus, high backing harmonies.
+   * Riff vocabulary (2026-11-16, rhythm bars of the 109 songs, share of the songs that use it):
+   *   riffs that mix chords and a bass-line run on the same guitar 84 % · single-note riffs with the 2nd
+   *   (1-2, b3-2-1) 80 % · natural harmonics inside the riff 66 % · sus2 / add9 chords 59 % · walking 4th
+   *   dyads 58 % · quartal 1-4-b7 stacks 54 % · inverted triads over a pedal note 49 % · 2nd dyads 43 % ·
+   *   power chord with the top voice moving sus4 → 3 → 9 over the pedal 21 %. The 4th dyads sit on the 5th
+   *   (7=0.5, 73 songs), the root, the 4th, the 2nd and the b7; the inverted triads are I (7=0.5.9, 46 songs),
+   *   IV, bVII, bIII, V, bVI; the 2nds are b7-root, root-9th, 4th-5th, b3-4th. The same guitarist plays the
+   *   riffs and the solos (84 of 109 songs), so both tracks share one "brown sound". The bass doubles the
+   *   moving guitar riff in some bars (intros, verses), else it drives 8ths with walk-ups (root-root-4-5).
+   * The riffs below are ORIGINAL, written with that vocabulary (bandriff notation: legends.js). */
   band('Van Halen', {
     band: 'vanhalen',
-    desc: 'Party hard rock with one guitar: riffs made of triads and sus4 chords over a muted open-string pedal, harmonics, a showman singer with high backing harmonies, and solos with tapping, legato and whammy dives over just bass and drums. Also fast shuffle boogies and synth-driven anthems.',
+    desc: 'Party hard rock with one guitar that plays riffs AND solos: open-string pedal riffs with inverted triads, walking 4th dyads, sus2 / add9 seconds, quartal chords, bass-line runs between the chords and harmonics; a showman singer with high backing harmonies, and solos with tap-pull-hammer tapping, legato, 4th double stops and whammy dives over just bass and drums. Also fast shuffle boogies and synth-driven anthems.',
     tempo: [112, 150, 128], swing: 0, grid: 8, key: { major: 'A', minor: 'A' }, mode: 'major',
     keys: { major: ['A', 'D', 'E', 'C', 'G'], minor: ['A', 'E', 'B', 'D'] }, minor: 0.39,
     structures: {
@@ -361,25 +371,50 @@
         solo: { kick: 'X.x...x.X.x...x.', snare: '....X.......X...', hho: 'x.x.x.x.x.x.x.x.' },
         bridge: { kick: 'X.......X.......', snare: '....X.......X...', tom2: 'x.x.x.x.x.x.x.x.' },
         fill: { snare: '........XX..XX..', tom1: '..........XX....', tom2: '..............XX', kick: 'X.......X.......' } } }),
-      T('bass', 'Bass', 'bass', 'Electric Bass - Pick', { play: 'style', plays: ['style', '8ths', 'roots'], fx: 'Dry', vol: 0.88, p: { style: {
-        intro: '0:R:2 2:R:2 4:R:2 6:R:2 8:R:2 10:R:2 12:R:2 14:R:2', verse: '0:R:2 2:R:2 4:R:2 6:R:2 8:R:2 10:R:2 12:R:2 14:R:2',
-        pre: '0:R:2 2:R:2 4:R:2 6:R:2 8:R:2 10:R:2 12:R:2 14:N:2', chorus: '0:R:2 2:R:2 4:R:2 6:R:2 8:R:2 10:R:2 12:R:2 14:A:2',
-        solo: '0:R:2 2:R:2 4:R:2 6:8:2 8:R:2 10:R:2 12:5:2 14:b7:2', bridge: '0:R:6 6:R:2 8:R:6 14:R:2' } } }),
+      // unison = in these sections the bass may double the guitar riff an octave lower (chance per section type)
+      T('bass', 'Bass', 'bass', 'Electric Bass - Pick', { play: 'style', plays: ['style', '8ths', 'roots'], fx: 'Dry', vol: 0.88,
+        unison: { intro: 0.6, verse: 0.3, pre: 0.25, bridge: 0.3 }, p: { style: {
+        intro: '0:R:2 2:R:2 4:R:2 6:R:2 8:R:2 10:R:2 12:R:2 14:R:2', verse: '0:R:2 2:R:2 4:R:2 6:R:2 8:R:2 10:R:2 12:4:2 14:5:2',
+        pre: '0:R:2 2:R:2 4:R:2 6:R:2 8:R:2 10:R:2 12:2:2 14:A:2', chorus: '0:R:2 2:R:2 4:R:2 6:R:2 8:R:2 10:R:2 12:R:2 14:A:2',
+        solo: '0:R:2 2:R:2 4:R:2 6:8:2 8:R:2 10:b7:2 12:5:2 14:3:2', bridge: '0:R:6 6:R:2 8:R:6 14:R:2' } } }),
       // the only guitar: it stops when the solo starts (bass and drums alone under the lead)
-      T('rhythm', 'Guitar', 'strum', 'Electric Guitar - Clean', { alt: 'guitar', play: 'bandriff', plays: ['bandriff', 'vh', 'power', 'pedal', 'octriff', 'stabs', 'sus4'], fx: 'Rock Distortion (DS-1)', vol: 0.66, pan: -0.25, in: IN('solo:0'),
+      T('rhythm', 'Guitar', 'strum', 'Electric Guitar - Clean', { alt: 'guitar', play: 'bandriff', plays: ['bandriff', 'vh', 'power', 'pedal', 'octriff', 'stabs', 'sus4'], fx: 'Brown Sound (Plexi)', vol: 0.66, pan: -0.2, in: IN('solo:0'),
         riffs: {
-          verse: ['0:T:2a 2:k0:1p 3:k0:1p 4:S:2 6:T:2 8:k0:1p 9:k0:1p 10:T:2a 12:k0:2p 14:S:2 | 0:T:2a 2:k0:1p 3:k0:1p 4:S:2 6:T:2 8:k0:2p 10:C:4a 14:k0:2p',
-                  '0:C:6a 6:C:2 8:k0:2p 10:k0:2p 12:k0:2p 14:k0:2p | 0:C:6a 6:C:2 8:k0:2p 10:k3:1 11:k4:1h 12:k7:2 14:k5:2',
-                  '0:C:2a 2:c:1p 3:c:1p 4:c:2p 6:C:2a 8:c:1p 9:c:1p 10:c:2p 12:C:2a 14:C:2',
-                  '0:k0:1p 1:k0:1p 2:T:2a 4:k0:1p 5:k0:1p 6:S:2a 8:k0:1p 9:k0:1p 10:T:2a 12:k0:1p 13:k0:1p 14:T:2',
-                  '0:0:2p 2:0:1p 3:3:1 4:4:2h 6:0:2p 8:7:2 10:5:1 11:7:1h 12:0:2p 14:C:2a | 0:0:2p 2:0:1p 3:3:1 4:4:2h 6:0:2p 8:10:2 10:12:2 12:C:4a'],
-          pre: ['0:C:4a 4:C:4 8:C:4 12:C:2 14:C:2', '0:c:2p 2:c:2p 4:c:2p 6:c:2p 8:c:2p 10:c:2p 12:C:2a 14:C:2a'],
-          chorus: ['0:C:6a 6:C:6a 12:C:2 14:C:2', '0:O:6a 6:O:2 8:O:4 12:T:2 14:S:2', '0:C:3a 3:C:3 6:C:2 8:C:3 11:C:3 14:C:2', '0:T:4a 4:S:2 6:T:4 10:S:2 12:T:4'],
-          bridge: ['0:C:16r', '0:T:8r 8:S:8r']
+          verse: [
+            // power chord over the open pedal, the top voice moving sus4 → 3 → 9, a b3-2-1 run and harmonics to close
+            '0:0=0.7.12.17:2a 2:0:1p 3:0:1p 4:0=0.7.12.16:2 6:0:2p 8:0:1p 9:0:1p 10:0=0.7.12.14:2 12:0:2p 14:0=0.7.12.16:2 | 0:0=0.7.12.17:2a 2:0:1p 3:0:1p 4:0=0.7.12.16:2 6:0:2p 8:0:1 9:2:1h 10:3:2 12:2:1p 13:0:1 14:H12:2',
+            // inverted triads (I, bVII, IV) against the muted root pedal, a 1-2-b3-2 answer
+            '0:0:2p 2:7=0.5.9:2a 4:0:2p 6:5=0.5.9:2 8:0:2p 10:7=0.5.9:2a 12:0:1p 13:0:1p 14:0=0.5.9:2 | 0:0:2p 2:7=0.5.9:2a 4:0:2p 6:5=0.5.9:2 8:7=0.5.9:4ar 12:0:1 13:2:1h 14:3:1 15:2:1p',
+            // walking 4th dyads between pedal notes, harmonics at the end
+            '0:7=0.5:2a 2:0:1p 3:0:1p 4:5=0.5:2 6:0:2p 8:7=0.5:2a 10:0:1p 11:0:1p 12:10=0.5:2 14:7=0.5:2 | 0:7=0.5:2a 2:0:1p 3:0:1p 4:5=0.5:2 6:3=0.5:2 8:2=0.5:2 10:0=0.5:2 12:H12:4',
+            // chords and a bass-line run on the same guitar (b3 hammered to the 3rd, up to the 5th and the octave)
+            '0:C:2a 2:C:2 4:0:1p 5:0:1p 6:3:1 7:4:1h 8:5:2 10:7:2 12:C:3a 15:0:1p | 0:C:2a 2:C:2 4:0:1p 5:0:1p 6:3:1 7:4:1h 8:7:2 10:10:1 11:12:1h 12:7=0.5.9:4a',
+            // the seconds: add9 with the open string ringing, sus2 of the IV, sus2 of the I
+            '0:0=0.7.12.14:4ar 4:0:2p 6:0:2p 8:0=0.7.12.16:3a 11:0=0.7.12.14:3 14:0:2p | 0:5=0.7.9:4ar 4:0:2p 6:0:2p 8:0=0.2.7:4a 12:0:1p 13:0:1p 14:0=0.7.12:2',
+            // 2nd dyads (4th-5th, b3-4th, b7-root) answering the muted pedal
+            '0:0:2p 2:5=0.2:2a 4:0:2p 6:3=0.2:2 8:0:2p 10:10=0.2:2a 12:0:2p 14:5=0.2:2 | 0:0:2p 2:5=0.2:2a 4:0:2p 6:3=0.2:2 8:0=0.7.12.14:6ar 14:10=0.2:2',
+            // quartal stacks (1-4-b7) and the sus4 on the 5th, a descending run to close
+            '0:0=0.5.10:2a 2:0:1p 3:0:1p 4:0=0.5.10:2 6:7=0.5.10:2 8:0:2p 10:0=0.5.10:2a 12:0:1p 13:0:1p 14:5=0.5.10:2 | 0:0=0.5.10:2a 2:0:1p 3:0:1p 4:0=0.5.10:2 6:7=0.5.10:2 8:0=0.7.12:4a 12:10:1 13:7:1 14:5:1 15:3:1',
+            // single-note riff with the 2nd, an octave-5th dyad, a 4th dyad and a harmonic
+            '0:0:2a 2:0:1p 3:2:1h 4:3:2 6:2:1p 7:0:1 8:12=0.7:2 10:0:2p 12:7=0.5:2 14:H12:2 | 0:0:2a 2:0:1p 3:2:1h 4:3:2 6:2:1p 7:0:1 8:10:2 10:7:1 11:5:1 12:7=0.7.12:4a',
+            // triads against the key pedal (the riff keeps its open note while the chords change)
+            '0:T:2a 2:k0:1p 3:k0:1p 4:S:2 6:T:2 8:k0:1p 9:k0:1p 10:T:2a 12:k0:2p 14:S:2 | 0:T:2a 2:k0:1p 3:k0:1p 4:S:2 6:T:2 8:k0:2p 10:C:4a 14:k0:2p',
+            '0:0:2p 2:0:1p 3:3:1 4:4:2h 6:0:2p 8:7:2 10:5:1 11:7:1h 12:0:2p 14:C:2a | 0:0:2p 2:0:1p 3:3:1 4:4:2h 6:0:2p 8:10:2 10:12:2 12:C:4a'],
+          pre: ['0:5=0.5:2a 2:5=0.5:2 4:7=0.5:2 6:7=0.5:2 8:10=0.5:2 10:10=0.5:2 12:0=0.7.12:2a 14:0=0.7.12:2',
+                '0:0=0.7.12.17:4a 4:0=0.7.12.16:4 8:0=0.7.12.17:4a 12:0=0.7.12.16:2 14:0=0.7.12.14:2',
+                '0:7=0.5.9:2a 2:0:2p 4:7=0.5.9:2 6:0:2p 8:5=0.5.9:2a 10:0:2p 12:2=0.5.9:2a 14:2=0.5.9:2',
+                '0:C:4a 4:C:4 8:C:4 12:C:2 14:C:2', '0:c:2p 2:c:2p 4:c:2p 6:c:2p 8:c:2p 10:c:2p 12:C:2a 14:C:2a'],
+          chorus: ['0:0=0.7.12.14:6ar 6:0=0.7.12:2 8:0=0.7.12.16:4a 12:0=0.7.12:2 14:C:2a',
+                   '0:7=0.5.9:3a 3:7=0.5.9:3 6:5=0.5.9:2 8:7=0.5.9:4a 12:0:2p 14:2=0.5.9:2',
+                   '0:0=0.7.12.17:3a 3:0=0.7.12.16:3 6:0=0.7.12:2 8:0=0.7.12.17:3a 11:0=0.7.12.16:3 14:0=0.7.12.14:2',
+                   '0:C:6a 6:C:2 8:C:4 12:C:2 14:C:2 | 0:C:6a 6:C:2 8:7=0.5:2 10:5=0.5:2 12:H12:4',
+                   '0:C:6a 6:C:6a 12:C:2 14:C:2', '0:O:6a 6:O:2 8:O:4 12:T:2 14:S:2', '0:C:3a 3:C:3 6:C:2 8:C:3 11:C:3 14:C:2'],
+          bridge: ['0:0=0.7.12.14:16r', '0:7=0.5.9:8r 8:5=0.5.9:8r', '0:H12:4 4:H7:4 8:H5:8', '0:C:16r', '0:T:8r 8:S:8r']
         } }),
       T('synth', 'Synthesizer', 'harmony', 'Synthesizer - Warm Poly', { alt: 'keys', on: false, play: 'chords', plays: ['chords', 'pad', 'arp'], fx: 'Synth Wide', vol: 0.6, pan: 0.2,
         p: { chords: { intro: '0:6 6:6 12:4', verse: '0:6 6:6 12:4', pre: '0:4 4:4 8:4 12:4', chorus: '0:6 6:6 12:2 14:2', bridge: '0:16', solo: '0:6 6:6 12:4', outro: '0:6 6:6 12:4' } } }),
-      T('lead', 'Lead Guitar', 'melody', 'Electric Guitar - Lead', { alt: 'lead', fx: 'Lead (TS + Delay)', vol: 0.76, pan: 0.1, lead: true, in: IN('intro:0 verse:.5 pre:0 chorus:.5 bridge:.5 solo:1 outro:.5'),
+      // the same guitarist and amp as the riffs (a little echo for the solos)
+      T('lead', 'Lead Guitar', 'melody', 'Electric Guitar - Lead', { alt: 'lead', fx: 'Brown Sound Lead', vol: 0.76, pan: 0.05, lead: true, in: IN('intro:0 verse:.5 pre:0 chorus:.5 bridge:.5 solo:1 outro:.5'),
         mel: { bends: true, vibrato: true, slides: true, harmonics: true, fast: true, triplets: true, complex: true } })
     ],
     vocal: { gender: 'male', range: [57, 74], voices: 2, choir: ['harmony', 'hook', 'harmony'], scoop: 0.35, melisma: 0.05, lift: 4, blue: true, above: true,
@@ -408,7 +443,8 @@
             fill: { snare: '........X.X.X.XX', tom1: '................', tom2: '..............XX', kick: 'X.......X.......' } } },
           bass: { p: { style: { verse: '0:R:2 2:3:2 4:5:2 6:6:2 8:b7:2 10:6:2 12:5:2 14:3:2', chorus: '0:R:2 2:R:2 4:5:2 6:6:2 8:R:2 10:R:2 12:5:2 14:A:2', solo: '0:R:2 2:3:2 4:5:2 6:6:2 8:b7:2 10:6:2 12:5:2 14:3:2', pre: '0:R:4 4:R:4 8:R:4 12:R:2 14:A:2' } } },
           rhythm: { riffs: {
-            verse: ['0:c:2 2:c:2p 4:c+2:2 6:c:2p 8:c:2 10:c:2p 12:c+2:2 14:c:2p', '0:0:2p 2:0:2p 4:3:1 5:4:1h 6:0:2p 8:7:2 10:9:2 12:10:2 14:9:2', '0:C:2a 2:0:2p 4:7:2 6:9:2 8:C:2a 10:0:2p 12:10:2 14:9:2'],
+            verse: ['0:c:2 2:c:2p 4:c+2:2 6:c:2p 8:c:2 10:c:2p 12:c+2:2 14:c:2p', '0:0:2p 2:0:2p 4:3:1 5:4:1h 6:0:2p 8:7:2 10:9:2 12:10:2 14:9:2', '0:C:2a 2:0:2p 4:7:2 6:9:2 8:C:2a 10:0:2p 12:10:2 14:9:2',
+                    '0:0:2a 2:2:1 3:3:1h 4:4:2 6:0:2p 8:7=0.5:2a 10:9:2 12:10:2 14:7=0.5:2', '0:7=0.5:2a 2:0:2p 4:9=0.5:2 6:0:2p 8:10=0.5:2a 10:0:2p 12:9=0.5:2 14:H12:2'],
             pre: ['0:C:4a 4:C:4 8:C:4 12:C:2 14:C:2'], chorus: ['0:C:6a 6:C:6a 12:C:2 14:C:2', '0:C:2a 2:c:2p 4:C:2a 6:c:2p 8:C:2a 10:c:2p 12:C:2 14:C:2'], bridge: ['0:C:16r'] } } } },
       synth: { n: 'Synth anthem — keyboard riff, guitar in the chorus', w: 2,
         d: 'A bright synthesizer plays the riff in dotted rhythm (intro and verses); the guitar waits for the pre-chorus, the chorus is major and wide, and the guitar solo arrives over the synth.',

@@ -40,7 +40,8 @@
  *    pedal     palm-muted pedal tone + power-chord accents (Rhoads, Wylde)
  *    gallop    metal gallop
  *    octriff   low single-note riff with octave accents (Morello)
- *    vh        triads moving over a palm-muted pedal (Van Halen)
+ *    vh        Van Halen: the riffs of the Van Halen band profile (bands.js) — pedal tones,
+ *              walking 4ths, inverted triads, sus2 / add9 seconds, harmonics, bass-line runs
  *    arpriff   picked arpeggio riff with ringing open colours (Slash)
  *    hendrix   chord + double-stop hammer-on fills, 7#9 on dominant chords
  *    texas     Texas shuffle: boogie bass line + muted up-stroke (S. R. Vaughan)
@@ -80,12 +81,23 @@
         [['mel', 16, { fast: 1 }]], [['run', 8, { dir: 1 }], ['hold', 8, { bend: 1, high: 1 }]]],
       peak: [[['uni', 6, {}], ['run', 10, { g: 4, dir: 1, fast: 1 }]], [['hold', 8, { bend: 1, high: 1 }], ['run', 8, { g: 3, dir: -1, fast: 1 }]]],
       fill: [[['run', 4, { dir: -1 }], ['hold', 4, { bend: 1 }]], [['hold', 8, { bend: 1 }]]] }),
-    vanhalen: H('Eddie Van Halen', 'two-hand tapping, legato flurries, tremolo picking, harmonics and dive bombs', {
+    /* Eddie Van Halen — measured in the reference library (109 songs, tools/style-analysis):
+     *  tapping in 70 songs, almost always TAP → PULL-OFF to the low fretted note → HAMMER-ON to the
+     *  middle one, in sextuplets (16th triplets). The figures (semitones below the tapped note) and how
+     *  many songs use them: −5 −2 (26) · −7 −4 (14) · −2 −5 (10) · −4 −7 (10) · −6 −3 / −7 −3 (8) ·
+     *  −8 −5 (7) · −10 −7 (6). Double stops in the solos are mostly 4ths (then 3rds), harmonics at the
+     *  5th / 7th / 12th fret, whole-tone bends, whammy dives, legato in 89 songs, triplets everywhere. */
+    vanhalen: H('Eddie Van Halen', 'two-hand tapping (tap – pull – hammer), legato flurries, double stops in 4ths, harmonics, tremolo picking and dive bombs', {
       scale: { minor: 'blues', major: 'mixoBlues' }, legato: 0.8, bend: 0.4,
+      tapFigs: [[[-5, -2], 26], [[-7, -4], 14], [[-2, -5], 10], [[-4, -7], 10], [[-7, -3], 8], [[-6, -3], 8], [[-8, -5], 7], [[-10, -7], 6], [[-4, -2], 5]],
       sig: [[['tap', 16, {}]], [['tap', 8, {}], ['run', 8, { dir: -1, fast: 1, leg: 1 }]], [['trem', 4, {}], ['run', 8, { dir: 1, fast: 1, leg: 1 }], ['hold', 4, { dive: 1 }]],
-        [['harm', 4, {}], ['run', 12, { g: 3, dir: -1, leg: 1 }]], [['hold', 6, { bend: 1 }], ['tap', 10, { walk: 1 }]]],
-      peak: [[['tap', 12, { walk: 1 }], ['hold', 4, { dive: 1 }]], [['run', 12, { dir: 1, fast: 1, leg: 1 }], ['hold', 4, { high: 1, pinch: 1 }]]],
-      fill: [[['tap', 8, {}]], [['run', 4, { dir: 1, leg: 1 }], ['hold', 4, { dive: 1 }]]] }),
+        [['harm', 4, {}], ['run', 12, { g: 3, dir: -1, leg: 1 }]], [['hold', 6, { bend: 1 }], ['tap', 10, { walk: 1 }]],
+        [['ds', 8, { kind: 'fourths' }], ['hold', 8, { dive: 1 }]], [['harm', 4, {}], ['tap', 12, { walk: 1 }]],
+        [['run', 8, { g: 3, dir: -1, leg: 1, fast: 1 }], ['ds', 8, { kind: 'fourths', dir: 1 }]], [['trem', 8, { high: 1 }], ['hold', 8, { dive: 1 }]],
+        [['ds', 16, { kind: 'fourths' }]]],
+      peak: [[['tap', 12, { walk: 1 }], ['hold', 4, { dive: 1 }]], [['run', 12, { dir: 1, fast: 1, leg: 1 }], ['hold', 4, { high: 1, pinch: 1 }]],
+        [['tap', 16, { walk: 1 }]], [['ds', 8, { kind: 'fourths', dir: 1 }], ['tap', 8, { walk: 1 }]]],
+      fill: [[['tap', 8, {}]], [['run', 4, { dir: 1, leg: 1 }], ['hold', 4, { dive: 1 }]], [['ds', 8, { kind: 'fourths' }]], [['harm', 8, {}]]] }),
     satriani: H('Joe Satriani', 'Lydian / Mixolydian melodies, liquid legato, whammy bar, harmonics', {
       scale: { minor: 'dorian', major: 'lydian' }, legato: 0.9, slide: 0.5, vib: 'wvib',
       sig: [[['run', 16, { dir: 1, leg: 1, scale: 1, fast: 1 }]], [['mel', 8, {}], ['run', 8, { dir: -1, leg: 1, scale: 1, fast: 1 }]], [['hold', 8, { si: 1 }], ['hold', 8, { dive: 1, high: 1 }]],
@@ -493,6 +505,7 @@
   G.tap = function (S, T, len, o) {
     const r = S.tempo <= 138 ? S6 : T3, tun = TUN();
     const n = Math.round(len / r);
+    if (S.hero.tapFigs) return tapFigures(S, T, len, o, r, n);
     let cyc = 0, last = S.p;
     for (let i = 0; i < n; i++) {
       const t = T + i * r, ph = i % 3;
@@ -513,6 +526,52 @@
     }
     S.p = last;
   };
+  /**
+   * Tapping with the figures of a player (hero.tapFigs = [[[first, second], weight], …] in semitones
+   * below the tapped note). Van Halen: TAP the high note, PULL OFF to the first fretted note, then
+   * HAMMER ON (second note higher) or PULL OFF again (second note lower) — 3 notes on ONE string,
+   * repeated; the tapped note is a chord tone, and with "walk" it climbs the chord every 2 groups.
+   * A figure is used only when its 3 notes belong to the scale of the moment (it follows the chords).
+   */
+  function tapFigures(S, T, len, o, r, n) {
+    const tun = TUN(), R = S.R, figs = S.hero.tapFigs;
+    let set = null, last = S.p, grp = 0, lastChord = null;
+    const choose = (t) => {
+      const ch = chordAt(S, t), sc = pcsAt(S, t, 'scale');
+      const tl = ladder(ch.pcs, S.center + 3, Math.min(S.hi + 7, tun[5] + FRETS()));
+      if (!tl.length) return null;
+      let i0 = nearIdx(tl, S.center + 9);
+      if (o.walk) i0 = Math.min(tl.length - 1, i0 + (Math.floor(grp / 2) % 3));
+      // figures in random order by their weight; the first that fits the scale and the fretboard wins
+      const pool = figs.map(([f, w]) => [f, Math.pow(Math.max(1e-9, R.next()), 1 / w)]).sort((a, b) => b[1] - a[1]).map(x => x[0]);   // weighted order
+      for (const di of [0, -1, 1, -2]) {
+        const top = tl[clamp(i0 + di, 0, tl.length - 1)];
+        for (const f of pool) {
+          const a = top + f[0], b = top + f[1];
+          if (!sc.includes(mod12(a)) || !sc.includes(mod12(b))) continue;
+          const lowest = Math.min(a, b);
+          const st = [5, 4, 3, 2].find(s => lowest - tun[s] >= 1 && top - tun[s] <= FRETS() && top - tun[s] - (lowest - tun[s]) <= 10);
+          if (st !== undefined) return { s: st, notes: [top, a, b], up: b > a, chord: ch.name };
+        }
+      }
+      return null;
+    };
+    for (let i = 0; i < n; i++) {
+      const t = T + i * r, ph = i % 3;
+      if (ph === 0) {
+        const ch = chordAt(S, t).name;
+        // a new figure when the chord changes, every 2 groups when walking, else every 4 (Eddie repeats a figure)
+        if (!set || ch !== lastChord || grp % (o.walk ? 2 : 4) === 0) set = choose(t) || set;
+        lastChord = ch; grp++;
+      }
+      if (!set) return G.run(S, t, len - i * r, { dir: 1, leg: 1 });
+      const p = set.notes[ph], s = set.s;
+      const tech = ph === 0 ? { tap: true } : ph === 1 ? { p: true } : (set.up ? { h: true } : { p: true });
+      S.emit(t, r, p, tech, { tup: true, string: s, fret: p - tun[s], acc: ph === 0 ? 3 : -8 });
+      last = p;
+    }
+    S.p = last;
+  }
   /** unison bend: the G string bent a whole tone up to the note held on the B string */
   G.uni = function (S, T, len) {
     if (!S.bends) return G.hold(S, T, len, {});
@@ -573,6 +632,23 @@
         S.emit(T + pos, d, a, Object.assign({}, tech), { acc: k === 0 ? 8 : 2 }); S.emit(T + pos, d, b, Object.assign({}, tech), { acc: k === 0 ? 8 : 2 });
       });
       S.p = b; return;
+    }
+    if (kind === 'fourths') {
+      // Van Halen: two notes a perfect 4th apart on neighbouring strings, rocking between two
+      // positions of the scale or walking along it (8ths; the last one held with vibrato)
+      const R = S.R, sc = lad(S, T, 'scale'), dir = o.dir || (R.chance(0.5) ? 1 : -1);
+      const moves = R.pick([[0, 1, 0, 1], [0, 1, 2, 1], [0, -1, 0, 1], [0, 1, 2, 3], [0, 0, 1, 0]]);
+      const n = Math.max(1, Math.floor(len / 2));
+      let i0 = clamp(nearIdx(sc, ctNear(S, T, S.p - 3)), 2, Math.max(2, sc.length - 4));
+      for (let k = 0; k < n; k++) {
+        const j = clamp(i0 + dir * moves[k % moves.length] + (k >= moves.length ? dir : 0), 0, sc.length - 1);
+        const lo = sc[j], hi = lo + 5, last = k === n - 1, d = last ? len - k * 2 : 2;
+        const tech = last && d >= 4 ? vibOf(S) : (k && R.chance(0.35) ? { slide: 'legato' } : {});
+        S.emit(T + k * 2, d, lo, Object.assign({}, tech), { acc: k % 2 ? 0 : 4 });
+        S.emit(T + k * 2, d, hi, Object.assign({}, tech), { acc: k % 2 ? 2 : 6 });
+        S.p = hi;
+      }
+      return;
     }
     // parallel thirds / sixths along the scale
     const sc = lad(S, T, 'scale'), gap = kind === 'sixths' ? 5 : 2, dir = o.dir || -1;
@@ -1073,7 +1149,7 @@
 
   /* ============================================================ RHYTHM == */
   L.RHYTHMS = {
-    pedal: 'Pedal-tone riff + power chords (Rhoads / Wylde)', gallop: 'Metal gallop', octriff: 'Low riff + octaves (Morello)', vh: 'Triads over a muted pedal (Van Halen)',
+    pedal: 'Pedal-tone riff + power chords (Rhoads / Wylde)', gallop: 'Metal gallop', octriff: 'Low riff + octaves (Morello)', vh: 'Van Halen riffs (pedal tones, 4ths, inverted triads, sus2 seconds, harmonics)',
     arpriff: 'Picked arpeggio riff (Slash)', hendrix: 'Chord + double-stop fills (Hendrix)', texas: 'Texas shuffle (Stevie Ray Vaughan)', delta: 'Delta blues: thumb bass + turnaround (Robert Johnson)',
     joepass: 'Walking bass + chords (Joe Pass)', funkline: 'Funk: muted 16ths, pops and 9th stabs',
     bassriff: 'Chords + bass-line riffs (Malcolm Young, Zeppelin)', stabs: 'Big chord stabs with space (AC/DC, the Who)',
@@ -1108,6 +1184,120 @@
     const RU = U(), RS = RU.makeRand(ctx.seed ^ RU.hash('legrh|' + play + '|' + type));     // the same riff for every bar of a section type
     const keyRoot = an.key.root;
 
+
+    /* ---------------------------------------------------------------------------------------------------
+     * BAND RIFFS (play 'bandriff', and 'vh' with the Van Halen riffs). spec.riffs[section] = list of riffs;
+     * a riff = 1, 2 or 4 bars separated by "|"; one token = "pos:what:len" + flags:
+     *   what   a number = a single note that many semitones above the chord root (low strings); k + number =
+     *          above the KEY root (pedal riffs keep their note while the chords change)
+     *          C = power chord (root, 5th, octave) · c = root + 5th · O = the full open chord · T = triad on the
+     *          D-G-B strings · S = the same triad with the 4th (sus4) · C+2 / c-2 = power chord moved by semitones
+     *          STACK  "low=i.j.k" = notes i, j, k semitones above a low note that is `low` semitones above the
+     *                 chord root (k-low: above the key root), one note per string, low to high, the low note
+     *                 on an open string when it is one (the pedal). Examples (Van Halen vocabulary):
+     *                 7=0.5    4th dyad on the 5th (inverted power chord)   0=0.5.10  quartal 1-4-b7
+     *                 7=0.5.9  the triad in 2nd inversion over its 5th      5=0.5.9   bVII triad over the root
+     *                 0=0.7.12.17 → 0=0.7.12.16 → 0=0.7.12.14   power chord with the top voice sus4 → 3 → 9
+     *                 10=0.2   2nd dyad (b7 + root)                         0=0.7.12.14  add9 with the open string
+     *                 On a minor chord (minor key for k) a major 3rd above the root becomes the minor 3rd.
+     *          H12 / H7 / H5  natural harmonics at that fret on two neighbouring strings that sound a note of
+     *                 the chord or of the key's pentatonic
+     *   flags  p palm mute · x dead note · h hammer-on · s slide in · a accent · . staccato · r let ring · v vibrato
+     * The idea (seed) picks ONE riff per section type: it is the hook of the song, so it repeats.
+     * Returns null when the profile has no riff for this section.
+     * --------------------------------------------------------------------------------------------------- */
+    function isMinorChord(ch) { return ch.intervals.includes(3) && !ch.intervals.includes(4); }
+    /** one note per string, low to high, fretted notes within 4 frets, near a fret; null = does not fit */
+    function stackOn(pitches, near) {
+      const n = pitches.length, F = FRETS();
+      let best = null;
+      const rec = (j, sMin, list) => {
+        if (j === n) {
+          const fr = list.filter(x => x.f > 0).map(x => x.f);
+          if (fr.length && Math.max(...fr) - Math.min(...fr) > 4) return;
+          const mid = fr.length ? fr.reduce((a, b) => a + b, 0) / fr.length : near;
+          const gaps = list[n - 1].s - list[0].s - (n - 1);
+          const sc = Math.abs(mid - near) + gaps * 3 + (list[0].f === 0 ? -2.5 : 0);
+          if (!best || sc < best.sc) best = { sc, list: list.slice() };
+          return;
+        }
+        for (let s2 = sMin; s2 <= 5 - (n - 1 - j); s2++) {
+          const f = pitches[j] - tun[s2];
+          if (f < 0 || f > F) continue;
+          list.push(at(s2, f)); rec(j + 1, s2 + 1, list); list.pop();
+        }
+      };
+      rec(0, 0, []);
+      return best ? best.list : null;
+    }
+    function bandRiff(RF, salt) {
+      const FB = { pre: 'verse', solo: 'chorus', bridge: 'verse', intro: 'verse', outro: 'chorus', part: 'verse' };
+      const rkey = RF[type] ? type : RF[FB[type]] ? FB[type] : 'verse', all = RF[rkey];
+      if (!all || !all.length) return null;
+      // intro = the verse riff (the riff opens the song); one riff per guitar and section
+      const RB = RU.makeRand(ctx.seed ^ RU.hash('bandriff|' + salt + '|' + rkey));
+      const riff = RB.pick(all).split('|').map(x => x.trim()), barStr = riff[c.k % riff.length];
+      let near = ctx.riffFret !== undefined ? ctx.riffFret : 4;
+      barStr.split(/\s+/).filter(Boolean).forEach(tok => {
+        const m = /^(\d+(?:\.\d+)?):(k?-?\d+=\d+(?:\.\d+)*|H\d+|k?-?\d+|[CcOTS](?:[+-]\d+)?):(\d+(?:\.\d+)?)([a-z.]*)$/.exec(tok); if (!m) return;
+        const p = +m[1], what = m[2], len = +m[3], fl = m[4] || '';
+        const chord = chAt(Math.min(15, Math.floor(p)));
+        const tech = {};
+        if (fl.includes('p')) tech.pm = true; if (fl.includes('x')) tech.mute = true; if (fl.includes('h')) tech.h = true;
+        if (fl.includes('s')) tech.slide = 'inBelow'; if (fl.includes('.')) tech.stacc = true; if (fl.includes('r')) tech.ring = true; if (fl.includes('v')) tech.vib = true;
+        const acc = fl.includes('a') ? 8 : 0, strong = p % 4 === 0 ? 4 : 0;
+        const sm = /^(k?)(-?\d+)=([\d.]+)$/.exec(what);
+        if (sm) {
+          // STACK: dyads, inverted triads, sus / add9 voicings, quartal chords
+          const key = !!sm[1], rootPc = key ? keyRoot : chord.root, r = lowRoot(rootPc);
+          const minorHere = key ? an.key.mode === 'minor' : isMinorChord(chord);
+          const low = r.pitch + parseInt(sm[2], 10);
+          let ps = sm[3].split('.').filter(x => x !== '').map(x => low + (+x));
+          if (minorHere) ps = ps.map(x => mod12(x - rootPc) === 4 ? x - 1 : x);
+          ps = Array.from(new Set(ps)).sort((a, b) => a - b);
+          let list = null;
+          while (ps.length && !(list = stackOn(ps, near))) ps.pop();        // too wide: the top note goes
+          if (!list || !list.length) return;
+          const fr = list.filter(x => x.f > 0).map(x => x.f);
+          if (fr.length) near = Math.round((near + fr.reduce((a, b) => a + b, 0) / fr.length) / 2);
+          const big = list.length >= 3 && !tech.pm && !tech.mute;
+          add(p, len, list, vel0 + (tech.pm ? 0 : 8) + acc + strong, Object.assign(big ? { strum: Math.round(p) % 4 === 2 ? 'up' : 'down' } : {}, tech));
+          return;
+        }
+        const hm = /^H(\d+)$/.exec(what);
+        if (hm) {
+          // natural harmonics: neighbouring strings whose harmonic is a note of the chord or of the key's pentatonic
+          const fret = +hm[1], up = fret === 7 || fret === 19 ? 7 : fret === 4 || fret === 9 ? 4 : 0;
+          const ok = chord.pcs.concat((an.key.mode === 'minor' ? [0, 3, 5, 7, 10] : [0, 2, 4, 7, 9]).map(x => mod12(keyRoot + x)));
+          const good = st => ok.includes(mod12(tun[st] + up));
+          const pair = [[3, 4], [4, 5], [2, 3], [1, 2]].find(([a, b]) => good(a) && good(b)) || [[3], [4], [2], [5]].find(([a]) => good(a));
+          if (!pair) return;
+          add(p, len, pair.map(st => at(st, fret)), vel0 + 2 + acc, Object.assign({ harm: true, ring: true }, tech));
+          return;
+        }
+          if (/^[Cc]/.test(what)) {
+            const sh = parseInt(what.slice(1), 10) || 0, pw = power(mod12(chord.root + sh));
+            add(p, len, what[0] === 'c' ? pw.slice(0, 2) : pw, vel0 + (tech.pm ? 0 : 10) + acc + strong, tech);
+          } else if (what === 'O') add(p, len, shapeOf(chord), vel0 + 8 + acc + strong, Object.assign({ strum: Math.round(p) % 4 === 2 ? 'up' : 'down' }, tech));
+          else if (what === 'T' || what === 'S') {
+            const minor = chord.intervals.includes(3) && !chord.intervals.includes(4), r = lowRoot(chord.root);
+            const pcs = (what === 'T' ? [0, minor ? 3 : 4, 7] : [0, 5, 7]).map(x => mod12(chord.root + x)), list = [];
+            [2, 3, 4].forEach(s2 => { for (let f = Math.max(0, r.f); f <= r.f + 7; f++) if (pcs.includes(mod12(tun[s2] + f)) && !list.some(x => mod12(x.pitch) === mod12(tun[s2] + f))) { list.push(at(s2, f)); break; } });
+            add(p, len, list, vel0 + 8 + acc + strong, tech);
+          } else {
+            const key = what[0] === 'k', r = lowRoot(key ? keyRoot : chord.root);
+            let deg = parseInt(key ? what.slice(1) : what, 10);
+            // minor chord (or minor key for pedal notes): the major 3rd of a riff becomes the 4th after a hammer-on, else the minor 3rd
+            const minorHere = key ? an.key.mode === 'minor' : (chord.intervals.includes(3) && !chord.intervals.includes(4));
+            if (minorHere && mod12(deg) === 4) deg += tech.h ? 1 : -1;
+            const x = on(r.pitch + deg, Math.max(r.f, 2), null);
+            if (x) add(p, len, [x], vel0 + (tech.pm ? -2 : 4) + acc + strong, tech);
+          }
+        });
+      ctx.riffFret = near;
+      return true;
+    }
+
     switch (play) {
       case 'pedal': case 'gallop': {
         const str = pickT(play === 'pedal' ? PEDAL : GALLOP, type);
@@ -1122,6 +1312,10 @@
         break;
       }
       case 'vh': {
+        // the riffs of the Van Halen band profile (bands.js): the same vocabulary when the guitarist is
+        // chosen in another genre (Rock…). Without the band profile: the triads over a muted pedal below.
+        const vhs = SDAW.STYLES && SDAW.STYLES['Van Halen'], vt = vhs && (vhs.tracks || []).find(x => x.id === 'rhythm');
+        if (vt && vt.riffs && bandRiff(vt.riffs, 'vh') !== null) break;
         const str = pickT(VH, type);
         for (let i = 0; i < 16; i++) {
           const ch = str[i]; if (ch === '.') continue;
@@ -1344,47 +1538,7 @@
         break;
       }
       case 'bandriff': {
-        /* The riffs of a band profile (bands.js → spec.riffs[section] = list of riffs; a riff = 1, 2 or 4 bars
-         * separated by "|"; one token = "pos:what:len" + flags):
-         *   what   a number = a single note that many semitones above the chord root (low strings); k + number = above
-         *          the KEY root (pedal riffs keep their note while the chords change)
-         *          C = power chord (root, 5th, octave) · c = root + 5th · O = the full open chord · T = triad on the
-         *          D-G-B strings · S = the same triad with the 4th (sus4) · C+2 / c-2 = power chord moved by semitones
-         *   flags  p palm mute · x dead note · h hammer-on · s slide in · a accent · . staccato · r let ring · v vibrato
-         * The idea (seed) picks ONE riff per section type: it is the hook of the song, so it repeats. */
-        const RF = c.spec.riffs || {}, FB = { pre: 'verse', solo: 'chorus', bridge: 'verse', intro: 'verse', outro: 'chorus', part: 'verse' };
-        const rkey = RF[type] ? type : RF[FB[type]] ? FB[type] : 'verse', all = RF[rkey];
-        if (!all || !all.length) return null;
-        // intro = the verse riff (the riff opens the song); one riff per guitar and section
-        const RB = RU.makeRand(ctx.seed ^ RU.hash('bandriff|' + (c.spec.id || '') + '|' + rkey));
-        const riff = RB.pick(all).split('|').map(x => x.trim()), barStr = riff[c.k % riff.length];
-        barStr.split(/\s+/).filter(Boolean).forEach(tok => {
-          const m = /^(\d+(?:\.\d+)?):(k?-?\d+|[CcOTS](?:[+-]\d+)?):(\d+(?:\.\d+)?)([a-z.]*)$/.exec(tok); if (!m) return;
-          const p = +m[1], what = m[2], len = +m[3], fl = m[4] || '';
-          const chord = chAt(Math.min(15, Math.floor(p)));
-          const tech = {};
-          if (fl.includes('p')) tech.pm = true; if (fl.includes('x')) tech.mute = true; if (fl.includes('h')) tech.h = true;
-          if (fl.includes('s')) tech.slide = 'inBelow'; if (fl.includes('.')) tech.stacc = true; if (fl.includes('r')) tech.ring = true; if (fl.includes('v')) tech.vib = true;
-          const acc = fl.includes('a') ? 8 : 0, strong = p % 4 === 0 ? 4 : 0;
-          if (/^[Cc]/.test(what)) {
-            const sh = parseInt(what.slice(1), 10) || 0, pw = power(mod12(chord.root + sh));
-            add(p, len, what[0] === 'c' ? pw.slice(0, 2) : pw, vel0 + (tech.pm ? 0 : 10) + acc + strong, tech);
-          } else if (what === 'O') add(p, len, shapeOf(chord), vel0 + 8 + acc + strong, Object.assign({ strum: Math.round(p) % 4 === 2 ? 'up' : 'down' }, tech));
-          else if (what === 'T' || what === 'S') {
-            const minor = chord.intervals.includes(3) && !chord.intervals.includes(4), r = lowRoot(chord.root);
-            const pcs = (what === 'T' ? [0, minor ? 3 : 4, 7] : [0, 5, 7]).map(x => mod12(chord.root + x)), list = [];
-            [2, 3, 4].forEach(s2 => { for (let f = Math.max(0, r.f); f <= r.f + 7; f++) if (pcs.includes(mod12(tun[s2] + f)) && !list.some(x => mod12(x.pitch) === mod12(tun[s2] + f))) { list.push(at(s2, f)); break; } });
-            add(p, len, list, vel0 + 8 + acc + strong, tech);
-          } else {
-            const key = what[0] === 'k', r = lowRoot(key ? keyRoot : chord.root);
-            let deg = parseInt(key ? what.slice(1) : what, 10);
-            // minor chord (or minor key for pedal notes): the major 3rd of a riff becomes the 4th after a hammer-on, else the minor 3rd
-            const minorHere = key ? an.key.mode === 'minor' : (chord.intervals.includes(3) && !chord.intervals.includes(4));
-            if (minorHere && mod12(deg) === 4) deg += tech.h ? 1 : -1;
-            const x = on(r.pitch + deg, Math.max(r.f, 2), null);
-            if (x) add(p, len, [x], vel0 + (tech.pm ? -2 : 4) + acc + strong, tech);
-          }
-        });
+        if (bandRiff(c.spec.riffs || {}, c.spec.id || '') === null) return null;
         break;
       }
       default: return null;

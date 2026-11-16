@@ -111,6 +111,9 @@
     'Blues Overdrive (BD-2)': { drive: { on: true, model: 'bd2', amount: 0.4 }, amp: { on: true, model: 'ac30', gain: 0.45 }, reverb: { on: true, model: 'spring', mix: 0.22 } },
     'Rock Distortion (DS-1)': { dist: { on: true, model: 'ds1', amount: 0.55 }, amp: { on: true, model: 'plexi', gain: 0.55 }, reverb: { on: true, model: 'room', mix: 0.14 } },
     'Lead (TS + Delay)': { drive: { on: true, model: 'ts808', amount: 0.6 }, amp: { on: true, model: 'plexi', gain: 0.6 }, delay: { on: true, model: 'analog', time: 2, feedback: 0.3, mix: 0.22 }, reverb: { on: true, model: 'hall', mix: 0.22 } },
+    // Van Halen "brown sound": a cranked Marshall (no distortion pedal), mids forward, a plate; the lead adds a short echo
+    'Brown Sound (Plexi)': { drive: { on: true, model: 'ts808', amount: 0.25, level: 0.7 }, amp: { on: true, model: 'plexi', gain: 0.72, mid: 0.6, presence: 0.6 }, reverb: { on: true, model: 'plate', mix: 0.14 } },
+    'Brown Sound Lead': { drive: { on: true, model: 'ts808', amount: 0.35, level: 0.7 }, amp: { on: true, model: 'plexi', gain: 0.75, mid: 0.6, presence: 0.6 }, delay: { on: true, model: 'tape', time: 2, feedback: 0.25, mix: 0.18 }, reverb: { on: true, model: 'plate', mix: 0.18 } },
     'Metal (MT-2)': { dist: { on: true, model: 'mt2', amount: 0.6 }, amp: { on: true, model: 'rect', gain: 0.6 }, reverb: { on: true, model: 'room', mix: 0.12 } },
     'Country Twang': { comp: { on: true, model: 'dyna', amount: 0.55 }, amp: { on: true, model: 'twin', gain: 0.35, treble: 0.65 }, delay: { on: true, model: 'digital', time: 0, feedback: 0.1, mix: 0.2 }, reverb: { on: true, model: 'spring', mix: 0.2 } },
     'Reggae Skank (Spring)': { amp: { on: true, model: 'twin', gain: 0.3 }, eq: { on: true, model: 'graphic', low: -6, mid: 2, high: 3 }, reverb: { on: true, model: 'spring', mix: 0.25 } },
@@ -149,13 +152,15 @@
     'Blues Overdrive (BD-2)': { ampModel: 'NAM · Vox AC10', namInput: 6, gain: 6, cab: 'IR · Celestion (real cab)', reverbType: 'Real spring (IR)', reverbMix: 0.2 },
     'Rock Distortion (DS-1)': { ampModel: 'NAM · Marshall JCM800', namInput: 12, gain: 8, cab: 'IR · Mesa 4x12 (real cab)', reverbType: 'Room', reverbMix: 0.12 },
     'Lead (TS + Delay)': { ampModel: 'NAM · Dumble ODS', namInput: 9, gain: 7.5, cab: 'IR · Celestion (real cab)', delayMix: 0.22, delayTime: 420, delayFeedback: 0.3, reverbType: 'Room', reverbMix: 0.16 },
+    'Brown Sound (Plexi)': { ampModel: 'NAM · Marshall JCM800', namInput: 10, gain: 7.5, mid: 6, presence: 6, cab: 'IR · Celestion (real cab)', reverbType: 'Real plate (IR)', reverbMix: 0.14 },
+    'Brown Sound Lead': { ampModel: 'NAM · Marshall JCM800', namInput: 11, gain: 8, mid: 6, presence: 6, cab: 'IR · Celestion (real cab)', delayMix: 0.16, delayTime: 320, delayFeedback: 0.22, reverbType: 'Real plate (IR)', reverbMix: 0.18 },
     'Metal (MT-2)': { ampModel: 'NAM · EVH 5153 (high gain)', namInput: 6, gain: 8, mid: 4.5, cab: 'IR · Mesa 4x12 (real cab)', reverbType: 'Room', reverbMix: 0.1, palmMute: 0.85 },
     'Country Twang': { ampModel: 'NAM · Fender Deluxe Reverb', pickupSel: 'Bridge', comp: 0.55, treble: 6.5, delayMix: 0.18, delayTime: 110, delayFeedback: 0.1, reverbType: 'Real spring (IR)', reverbMix: 0.14 },
     'Funk (Comp + Clean)': { ampModel: 'NAM · Roland JC-120', pickupSel: 'Middle + Bridge', comp: 0.6, reverbType: 'Room', reverbMix: 0.1 },
     'Reggae Skank (Spring)': { ampModel: 'NAM · Fender Deluxe Reverb', eqLow: -6, eqUpMid: 2, reverbType: 'Real spring (IR)', reverbMix: 0.25 },
     'Dub Delay': { delayMix: 0.3, delayTime: 500, delayFeedback: 0.5, reverbType: 'Real plate (IR)', reverbMix: 0.25 }
   };
-  const DIST_FX = /Distortion|Metal|Crunch|Lead \(TS/;
+  const DIST_FX = /Distortion|Metal|Crunch|Lead \(TS|Brown Sound/;
   /** which Guitar Rig guitar plays a guitar instrument of a genre (null = not a guitar) */
   SG.rigModelFor = function (instName, fxName) {
     const item = Object.keys(SG.RIG_ITEMS).find(m => SG.RIG_ITEMS[m] === instName);
@@ -509,6 +514,7 @@
       out.push(n); ctx.prevBass = pitch;
     };
     if (c.finalBar) { const ch = an.chordAt(bar * BAR); push(0, 16, nearPc(ch.bass !== undefined ? ch.bass : ch.root, prev(), lo, hi - 7), ctx.baseVel + 8); return out; }
+    if (unisonBar(c, push, lo, hi)) return out;
     if (play === 'walking' && ctx.level === 1) {
       for (let b = 0; b < 4; b++) {
         const tick = bar * BAR + b * 4, ch = an.chordAt(tick);
@@ -547,6 +553,32 @@
       push(t.p, t.len, U().fold(pitch, lo, hi), ctx.baseVel + (t.p === 0 ? 8 : 0) + (t.p % 4 === 0 ? 3 : -2) + R.range(-3, 3));
     });
     return out;
+  }
+
+  /**
+   * Bass riffs in unison with the guitar (band profiles: bass spec.unison = { section: chance }): the bass
+   * doubles the riff of the rhythm guitar an octave lower — its lowest note of every hit, same rhythm.
+   * The guitar's riff is computed exactly as the guitar track computes it (same seed), so both play the
+   * same figure. The idea (seed) decides per section type whether the bass doubles there.
+   */
+  function unisonBar(c, push, lo, hi) {
+    const { ctx, spec, type } = c;
+    if (!spec.unison || !spec.unison[type] || ctx.level !== 1 || !SDAW.legends) return false;
+    if (!U().makeRand(((ctx.opts && ctx.opts.seed) >>> 0 || 1) ^ U().hash('unison|' + type)).chance(spec.unison[type])) return false;
+    const gs = (ctx.style && ctx.style.tracks || []).find(t => t.id === (spec.unisonWith || 'rhythm'));
+    if (!gs || (gs.in && gs.in[type] === 0)) return false;
+    const gt = SDAW.store.song.tracks.find(t => t.styleTrack === gs.id);
+    if (!gt) return false;
+    const gctx = Object.assign({}, ctx, { track: gt, role: gs.role, seed: (((ctx.opts && ctx.opts.seed) >>> 0) || 1) ^ U().hash(gt.name + gs.role) });
+    let notes = null;
+    try { notes = SDAW.legends.rhythmBar(Object.assign({}, c, { ctx: gctx, spec: gs }), gt.play || gs.play || 'bandriff'); } catch (e) { notes = null; }
+    if (!notes || !notes.length) return false;
+    const low = {};
+    notes.forEach(n => { if (!(n.tech && n.tech.harm) && (!low[n.start] || n.pitch < low[n.start].pitch)) low[n.start] = n; });
+    const hits = Object.values(low).sort((a, b) => a.start - b.start);
+    if (hits.length < 2) return false;
+    hits.forEach(n => push(n.start, n.dur, U().fold(n.pitch - 12, lo, hi - 7), ctx.baseVel + (n.start === 0 ? 8 : n.start % 4 === 0 ? 3 : -2) + (n.tech && n.tech.pm ? -6 : 0)));
+    return true;
   }
 
   /* ---------------------------------------------- harmony & guitars --- */
