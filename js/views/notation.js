@@ -42,9 +42,6 @@
   function paletteW() { return nt.paletteOpen && !nt.printTarget ? 214 : 0; }
 
   function layout(track) {
-    const N = CONFIG.ui.notationBarsPerLine;
-    const avail = (nt.printWidth || (document.getElementById('editorBody') || {}).clientWidth || 1300) - paletteW();
-    const barW = Math.max(CONFIG.ui.notationBarWidth * 0.7, Math.floor((avail - LEFT - 24 - 56) / N));
     const nStr = track && track.type === 'bass' ? 4 : 6;
     const showScore = nt.mode !== 'tab', showTab = nt.mode !== 'score' && track && (track.type === 'guitar' || track.type === 'bass');
     const CH = 26;
@@ -54,14 +51,129 @@
     const lowerStaffOff = staffOff + 92;
     const scoreBottomOff = (grandStaff ? lowerStaffOff : staffOff) + 40;
     const sysH = (showTab ? tabOff + (nStr - 1) * TAB_SP : scoreBottomOff + 30) + 40;
-    return { N, barW, nStr, showScore, showTab, CH, staffOff, tabOff, grandStaff, lowerStaffOff, scoreBottomOff, sysH, width: LEFT + N * barW + 24 };
+    return { nStr, showScore, showTab, CH, staffOff, tabOff, grandStaff, lowerStaffOff, scoreBottomOff, sysH };
   }
   const BT = () => SDAW.barTicks();               // ticks per bar (time signature)
-  function tickX(L, tick) {
-    const B = BT(), b = Math.floor(tick / B);
-    return LEFT + (b % L.N) * L.barW + 20 + ((tick - b * B) / B) * (L.barW - 32);
+
+  function tabLabel(note) {
+    const tech = note.tech || {};
+    const label = tech.mute ? 'x' : (tech.harm || tech.pinch) ? '<' + note.fret + '>' : String(note.fret);
+    return tech.ghost || note.tie ? '(' + label + ')' : label;
   }
-  const lineOf = (L, tick) => Math.floor(Math.floor(tick / BT()) / L.N);
+
+  const tabLabelWidth = label => label.length * 8 + 6;
+
+  // One horizontal position per onset, shared by all voices and by the tab.
+  function layoutMeasures(L, song, groups, rests) {
+    const B = BT();
+    const columns = Array.from({ length: song.bars }, () => new Map());
+    function reserve(tick, left, right) {
+      const bar = Math.floor(tick / B);
+      if (!columns[bar]) return;
+      const offset = Math.round((tick - bar * B) * 1000) / 1000;
+      if (offset >= B) return;
+      const column = columns[bar].get(offset) || { tick: offset, left: 0, right: 0 };
+      column.left = Math.max(column.left, left);
+      column.right = Math.max(column.right, right);
+      columns[bar].set(offset, column);
+    }
+    groups.forEach(group => {
+      const symbol = symbolFor(Math.max(...group.notes.map(baseDur)));
+      group.notes.forEach(n => {
+        const tech = n.tech || {};
+        let left = 0, right = 0;
+        if (L.showScore) {
+          left = SDAW.isBlack(n.pitch) ? 23 : tech.ghost ? 16 : 10;
+          const flagged = ['e', 's', 't'].includes(symbol.sym);
+          right = flagged ? 24 : symbol.dot || tech.ghost ? 16 : 10;
+        }
+        if (L.showTab && n.string !== undefined) {
+          const half = tabLabelWidth(tabLabel(n)) / 2;
+          left = Math.max(left, half, tech.slide ? 18 : 0);
+          right = Math.max(right, half, tech.bend ? 35 : tech.slide ? 19 : 0);
+        }
+        reserve(group.start, left, right);
+      });
+    });
+    rests.forEach(r => { if (!r.centered) reserve(r.tick, 10, 10); });
+    song.chords.forEach(c => reserve(c.tick, 0, c.name.length * 8 + 5));
+    const avail = (nt.printWidth || (document.getElementById('editorBody') || {}).clientWidth || 1300) - paletteW();
+    const limit = avail - 64;
+    const bars = [], systems = [];
+    const marks = song.barMarks || {};
+    columns.forEach((byTick, index) => {
+      if (!byTick.has(0)) byTick.set(0, { tick: 0, left: 0, right: 0 });
+      const anchors = [...byTick.values()].sort((a, b) => a.tick - b.tick);
+      let prev = anchors[0];
+      prev.x = Math.max(16, (marks[index]?.rs ? 19 : 6) + prev.left);
+      for (const next of anchors.slice(1)) {
+        const rhythm = 8 * Math.sqrt(next.tick - prev.tick);
+        next.x = prev.x + Math.max(rhythm, prev.right + next.left + 12);
+        prev = next;
+      }
+      const endSpace = marks[index]?.re ? 20 : 8;
+      const width = Math.ceil(Math.max(46, prev.x + prev.right + endSpace + Math.sqrt(B - prev.tick)));
+      anchors.push({ tick: B, x: width - endSpace });
+      bars.push({ index, width, anchors });
+    });
+
+    // A dense measure may require horizontal scrolling, but every system shares
+    // that same right margin. Never compress the minimum symbol spacing.
+    const rightEdge = Math.max(LEFT + 46, limit, ...bars.map(bar => LEFT + bar.width));
+    let system = { bars: [], end: LEFT };
+    bars.forEach(bar => {
+      if (system.bars.length && (system.bars.length >= CONFIG.ui.notationBarsPerLine || system.end + bar.width > rightEdge)) {
+        systems.push(system);
+        system = { bars: [], end: LEFT };
+      }
+      bar.line = systems.length;
+      system.bars.push(bar);
+      system.end += bar.width;
+    });
+    if (system.bars.length) systems.push(system);
+
+    systems.forEach(row => {
+      const naturalWidth = row.end - LEFT;
+      const extra = rightEdge - row.end;
+      let x = LEFT;
+      row.bars.forEach((bar, index) => {
+        const oldWidth = bar.width;
+        const addition = index === row.bars.length - 1
+          ? rightEdge - x - oldWidth
+          : extra * oldWidth / naturalWidth;
+        const firstX = bar.anchors[0].x;
+        const lastX = bar.anchors[bar.anchors.length - 1].x;
+        // Keep the leading and trailing margins, expanding only the space
+        // between rhythmic positions. Cursor and playback use these anchors too.
+        bar.anchors.forEach(anchor => {
+          anchor.x += addition * (anchor.x - firstX) / (lastX - firstX);
+        });
+        bar.x = x;
+        bar.width = oldWidth + addition;
+        x += bar.width;
+      });
+      row.end = rightEdge;
+    });
+    Object.assign(L, { bars, systems, width: Math.max(420, rightEdge + 24) });
+  }
+
+  function interpolate(anchors, value, from, to) {
+    let i = 1;
+    while (i < anchors.length - 1 && anchors[i][from] < value) i++;
+    const a = anchors[i - 1], b = anchors[i];
+    const fraction = SDAW.clamp((value - a[from]) / (b[from] - a[from]), 0, 1);
+    return a[to] + (b[to] - a[to]) * fraction;
+  }
+
+  function tickBar(L, tick) {
+    if (!L.bars?.length) return null;
+    return L.bars[SDAW.clamp(Math.floor(tick / BT()), 0, L.bars.length - 1)];
+  }
+  function tickX(L, tick) {
+    const bar = tickBar(L, tick);
+    return bar ? bar.x + interpolate(bar.anchors, tick - bar.index * BT(), 'tick', 'x') : LEFT;
+  }
+  const lineOf = (L, tick) => tickBar(L, tick)?.line ?? 0;
   const stepOf = (p) => Math.floor(p / 12) * 7 + LETTER[p % 12];
 
   /** Drawable symbol for a written (base) duration */
@@ -93,11 +205,6 @@
     const L = layout(t);
     const vnotes = s.trackNotes(t);
     nt.vnotes = vnotes;
-    const lines = Math.ceil(song.bars / L.N);
-    const H = lines * L.sysH + 30;
-    const root = svg('svg', { width: L.width, height: H, viewBox: `0 0 ${L.width} ${H}` });
-    const add = (n) => { root.appendChild(n); return n; };
-    const T = (x, y, txt, a) => add(svg('text', Object.assign({ x, y, fill: INK, 'font-size': 12 }, a || {}), txt));
     const isGuitar = t.type === 'guitar' || t.type === 'bass';
     const avgP = vnotes.length ? vnotes.reduce((a, n) => a + n.pitch, 0) / vnotes.length : 60;
     const bassClef = !L.grandStaff && (t.type === 'bass' || (!isGuitar && avgP < 52));
@@ -107,6 +214,66 @@
     const marks = song.barMarks || {};
     const multiVoiceTrack = vnotes.some(n => n.voice);
 
+    const key = (st) => Math.round(st * 24);
+    const groups = new Map();
+    // every note gets a string; notes of one chord on different strings (SDAW.fixStrings, model.js)
+    SDAW.fixStrings(vnotes, t.type);
+    vnotes.forEach(n => {
+      const staff = L.grandStaff ? SDAW.pianoStaffForPitch(n.pitch) : 1;
+      const voice = n.voice || 0;
+      const k = key(n.start) + '|' + staff + '|' + voice;
+      if (!groups.has(k)) groups.set(k, { notes: [], staff, voice });
+      groups.get(k).notes.push(n);
+    });
+    const glist = [...groups.values()];
+    glist.forEach(g => {
+      g.notes.sort((a, b) => a.pitch - b.pitch);
+      g.start = g.notes[0].start;
+    });
+    glist.sort((a, b) => a.start - b.start || a.voice - b.voice);
+    const groupsInBar = new Map();
+    const barKey = (staff, bar) => staff + '|' + bar;
+    const voiceKey = g => g.staff + '|' + g.voice;
+    glist.forEach(g => {
+      const k = barKey(g.staff, Math.floor(g.start / BT()));
+      if (!groupsInBar.has(k)) groupsInBar.set(k, new Map());
+      const voices = groupsInBar.get(k);
+      if (!voices.has(g.voice)) voices.set(g.voice, []);
+      voices.get(g.voice).push(g);
+    });
+
+    const rests = [];
+    if (L.showScore) {
+      staves.forEach(({ offset }, i) => {
+        for (let b = 0; b < song.bars; b++) {
+          const voices = groupsInBar.get(barKey(i + 1, b)) || new Map();
+          const vlist = [...voices.keys()]; if (!vlist.includes(0)) vlist.push(0);
+          vlist.forEach(v => {
+            const bs = b * BT(), be = bs + BT(), multi = vlist.length > 1;
+            let cur = bs; const gaps = [];
+            (voices.get(v) || []).forEach(g => {
+              if (g.start > cur + 0.01) gaps.push([cur, g.start - cur]);
+              cur = Math.max(cur, Math.min(be, g.start + Math.max(...g.notes.map(n => n.dur))));
+            });
+            if (cur < be - 0.01) gaps.push([cur, be - cur]);
+            const col = multi ? VOICE_COLORS[v] : INK;
+            gaps.forEach(([gs, gl]) => {
+              const full = gs - bs < 0.01 && gl >= BT() - 0.01;
+              (full ? [[0, 16]] : restsFor(gs - bs, gl)).forEach(([rt, rv]) => {
+                rests.push({ bar: b, tick: bs + rt, duration: rv, offset, col, centered: full && !multi, dy: multi ? (v % 2 ? 10 : -8) : 0 });
+              });
+            });
+          });
+        }
+      });
+    }
+
+    layoutMeasures(L, song, glist, rests);
+    const lines = L.systems.length;
+    const H = lines * L.sysH + 30;
+    const root = svg('svg', { width: L.width, height: H, viewBox: `0 0 ${L.width} ${H}` });
+    const add = (n) => { root.appendChild(n); return n; };
+    const T = (x, y, txt, a) => add(svg('text', Object.assign({ x, y, fill: INK, 'font-size': 12 }, a || {}), txt));
     T(LEFT, 18, song.title + ' — ' + t.name, { 'font-size': 15, 'font-weight': 700 });
     T(L.width - 24, 18, '♩ = ' + song.tempo + '   ·   ' + song.key + ' ' + song.scale + (isGuitar ? '   ·   ' + (t.type === 'bass' ? 'E A D G' : 'E A D G B E') : ''), { 'font-size': 12, fill: FAINT, 'text-anchor': 'end' });
 
@@ -114,8 +281,8 @@
     for (let ln = 0; ln < lines; ln++) {
       const y0 = 26 + ln * L.sysH;
       const staffTop = y0 + L.staffOff, staffBot = y0 + L.scoreBottomOff, tabTop = y0 + L.tabOff, tabBot = tabTop + (L.nStr - 1) * TAB_SP;
-      const firstBar = ln * L.N, barsHere = Math.min(L.N, song.bars - firstBar);
-      const x1 = LEFT + barsHere * L.barW;
+      const { bars, end: x1 } = L.systems[ln];
+      const firstBar = bars[0].index, barsHere = bars.length;
       if (L.showScore) {
         staves.forEach(({ offset, bass }) => {
           const top = y0 + offset;
@@ -146,7 +313,8 @@
         if (L.showTab) [0.36, 0.64].forEach(f => add(svg('circle', { cx: x, cy: tabTop + (tabBot - tabTop) * f, r: 2.2, fill: INK })));
       };
       for (let b = 0; b <= barsHere; b++) {
-        const x = LEFT + b * L.barW, barNo = firstBar + b;
+        const x = bars[b]?.x ?? x1, barNo = firstBar + b;
+        const barW = bars[b]?.width;
         const prevM = marks[barNo - 1] || {}, m = marks[barNo] || {};
         const isEnd = barNo === song.bars;
         if (b > 0 && prevM.re) { vline(x - 8, 1); vline(x - 2.5, 3.5); dots(x - 14); if ((prevM.re | 0) > 2) T(x - 6, (L.showScore ? staffTop : tabTop) - 8, '×' + prevM.re, { 'font-size': 11, 'font-weight': 700, 'text-anchor': 'end' }); }
@@ -158,7 +326,7 @@
           T(x + 3, (L.showScore ? staffTop : tabTop) - 6, String(barNo + 1), { 'font-size': 10, fill: FAINT });
           // alternate ending bracket
           if (m.end && m.end.length) {
-            const by = y0 + L.CH + 14, bx = x + 2, bw = L.barW - 6;
+            const by = y0 + L.CH + 14, bx = x + 2, bw = barW - 6;
             add(svg('path', { d: `M${bx} ${by + 14} V${by} H${bx + bw}`, fill: 'none', stroke: INK, 'stroke-width': 1.2 }));
             T(bx + 5, by + 12, m.end.join('., ') + '.', { 'font-size': 12, 'font-weight': 700 });
           }
@@ -168,9 +336,9 @@
           if (m.segno) markTxt('𝄋', { 'font-size': 22, class: 'music', 'font-style': 'normal' });
           if (m.coda) markTxt('𝄌', { 'font-size': 22, class: 'music', 'font-style': 'normal' });
           if (m.text) markTxt(m.text);
-          if (m.fine) T(x + L.barW - 6, staffBot + 34, 'Fine', { 'font-size': 13, 'font-weight': 700, 'font-style': 'italic', 'text-anchor': 'end' });
-          if (m.tocoda) T(x + L.barW - 6, staffTop - 22, 'To Coda 𝄌', { 'font-size': 12, 'font-weight': 700, 'font-style': 'italic', 'text-anchor': 'end' });
-          if (m.jump) T(x + L.barW - 6, staffBot + 34, m.jump, { 'font-size': 12, 'font-weight': 700, 'font-style': 'italic', 'text-anchor': 'end' });
+          if (m.fine) T(x + barW - 6, staffBot + 34, 'Fine', { 'font-size': 13, 'font-weight': 700, 'font-style': 'italic', 'text-anchor': 'end' });
+          if (m.tocoda) T(x + barW - 6, staffTop - 22, 'To Coda 𝄌', { 'font-size': 12, 'font-weight': 700, 'font-style': 'italic', 'text-anchor': 'end' });
+          if (m.jump) T(x + barW - 6, staffBot + 34, m.jump, { 'font-size': 12, 'font-weight': 700, 'font-style': 'italic', 'text-anchor': 'end' });
           const sec = song.sections.find(sc => sc.start === barNo);
           if (sec) {
             add(svg('rect', { x: x + 2, y: y0 - 2, width: sec.name.length * 7.5 + 12, height: 17, rx: 4, fill: sec.color }));
@@ -183,62 +351,12 @@
 
     /* ----------------------------------------------------------- notes --- */
     const sel = new Set(nt.printTarget ? [] : s.sel.noteIds);
-    const key = (st) => Math.round(st * 24);
-    const groups = new Map();
-    // every note gets a string; notes of one chord on different strings (SDAW.fixStrings, model.js)
-    SDAW.fixStrings(vnotes, t.type);
-    vnotes.forEach(n => {
-      const staff = L.grandStaff ? SDAW.pianoStaffForPitch(n.pitch) : 1;
-      const voice = n.voice || 0;
-      const k = key(n.start) + '|' + staff + '|' + voice;
-      if (!groups.has(k)) groups.set(k, { notes: [], staff, voice });
-      groups.get(k).notes.push(n);
+    rests.forEach(r => {
+      const bar = L.bars[r.bar], staffTop = 26 + bar.line * L.sysH + r.offset;
+      const x = r.centered ? bar.x + bar.width / 2 : tickX(L, r.tick);
+      const y = staffTop + r.dy + (r.duration === 16 ? 12 : r.duration === 8 ? 20 : 26);
+      T(x, y, REST_GLYPH[r.duration], { 'font-size': 26, class: 'music', fill: r.col, 'text-anchor': 'middle' });
     });
-    const glist = [...groups.values()];
-    glist.forEach(g => {
-      g.notes.sort((a, b) => a.pitch - b.pitch);
-      g.start = g.notes[0].start;
-    });
-    glist.sort((a, b) => a.start - b.start || a.voice - b.voice);
-    const groupsInBar = new Map();
-    const barKey = (staff, bar) => staff + '|' + bar;
-    const voiceKey = g => g.staff + '|' + g.voice;
-    glist.forEach(g => {
-      const k = barKey(g.staff, Math.floor(g.start / BT()));
-      if (!groupsInBar.has(k)) groupsInBar.set(k, new Map());
-      const voices = groupsInBar.get(k);
-      if (!voices.has(g.voice)) voices.set(g.voice, []);
-      voices.get(g.voice).push(g);
-    });
-
-    // rests (score)
-    if (L.showScore) {
-      staves.forEach(({ offset }, i) => {
-        for (let b = 0; b < song.bars; b++) {
-          const voices = groupsInBar.get(barKey(i + 1, b)) || new Map();
-          const vlist = [...voices.keys()]; if (!vlist.includes(0)) vlist.push(0);
-          vlist.forEach(v => {
-            const bs = b * BT(), be = bs + BT(), multi = vlist.length > 1;
-            let cur = bs; const gaps = [];
-            (voices.get(v) || []).forEach(g => {
-              if (g.start > cur + 0.01) gaps.push([cur, g.start - cur]);
-              cur = Math.max(cur, Math.min(be, g.start + Math.max(...g.notes.map(n => n.dur))));
-            });
-            if (cur < be - 0.01) gaps.push([cur, be - cur]);
-            const ln = lineOf(L, bs), staffTop = 26 + ln * L.sysH + offset;
-            const col = multi ? VOICE_COLORS[v] : INK;
-            gaps.forEach(([gs, gl]) => {
-              const full = gs - bs < 0.01 && gl >= BT() - 0.01;
-              (full ? [[0, 16]] : restsFor(gs - bs, gl)).forEach(([rt, rv]) => {
-                const x = (full && !multi) ? LEFT + (b % L.N) * L.barW + L.barW / 2 : tickX(L, bs + rt);
-                const dy = multi ? (v % 2 ? 10 : -8) : 0;
-                T(x, staffTop + dy + (rv >= 8 ? (rv === 16 ? 12 : 20) : 26), REST_GLYPH[rv], { 'font-size': 26, class: 'music', fill: col, 'text-anchor': 'middle' });
-              });
-            });
-          });
-        }
-      });
-    }
 
     // previous note on the same voice (for slides, h/p, ties)
     const lastByVoice = new Map();
@@ -332,9 +450,8 @@
           if (n.string === undefined) return;
           const tn = n.tech || {};
           const sy = tabTop + (L.nStr - 1 - n.string) * TAB_SP;
-          let label = tn.mute ? 'x' : (tn.harm || tn.pinch) ? '<' + n.fret + '>' : String(n.fret);
-          if (tn.ghost || n.tie) label = '(' + label + ')';
-          const w = label.length * 7 + 4;
+          const label = tabLabel(n);
+          const w = tabLabelWidth(label);
           add(svg('rect', { x: x - w / 2, y: sy - 7, width: w, height: 14, fill: '#fbfaff' }));
           T(x, sy + 4.5, label, { 'font-size': 13, 'font-weight': 600, fill: sel.has(n.id) ? ACCENT : (multiVoiceTrack ? VOICE_COLORS[g.voice] : INK), 'text-anchor': 'middle', 'data-note': n.id });
           if (sel.has(n.id)) add(svg('rect', { x: x - w / 2 - 2, y: sy - 9, width: w + 4, height: 18, rx: 4, fill: 'rgba(155,92,255,.18)', stroke: ACCENT }));
@@ -441,7 +558,7 @@
       nt.render();
       const svgEl = box.querySelector('svg');
       if (!svgEl) return null;
-      const L = nt.L, lines = Math.ceil(s.song.bars / L.N);
+      const L = nt.L, lines = L.systems.length;
       return { svg: svgEl.outerHTML, inner: svgEl.innerHTML, width: L.width, height: +svgEl.getAttribute('height'), sysH: L.sysH, lines };
     } finally {
       s.sel.trackId = keep.tid; nt.mode = keep.mode; nt.printTarget = null; nt.printWidth = null;
@@ -465,9 +582,9 @@
 
   nt.scrollToTick = function (tick) {
     const t = SDAW.store.selTrack(); if (!t) return;
-    const L = layout(t);
     SDAW.store.setCursor(tick);
-    $('#view-notation').scrollTop = lineOf(L, tick) * L.sysH;
+    const L = nt.L, view = $('#view-notation');
+    if (L && view) view.scrollTop = lineOf(L, tick) * L.sysH;
   };
 
   /* ============================================================ MOUSE == */
@@ -516,13 +633,11 @@
     const ln = Math.floor((p.y - 26) / L.sysH);
     if (ln < 0) return;
     const y0 = 26 + ln * L.sysH;
-    const col = Math.floor((p.x - LEFT) / L.barW);
-    if (col < 0 || col >= L.N) return;
-    const bar = ln * L.N + col;
-    if (bar >= s.song.bars) return;
-    const frac = (p.x - (LEFT + col * L.barW) - 20) / (L.barW - 32);
+    const bar = L.systems[ln]?.bars.find(b => p.x >= b.x && p.x < b.x + b.width);
+    if (!bar) return;
+    const offset = interpolate(bar.anchors, p.x - bar.x, 'x', 'tick');
     const step = Math.min(1, s.curDur());
-    const B = BT(), tick = bar * B + SDAW.clamp(Math.round(frac * B / step) * step, 0, B - step);
+    const B = BT(), tick = bar.index * B + SDAW.clamp(Math.round(offset / step) * step, 0, B - step);
     let hitId = target;
     if (!hitId) {
       const near = nt.pos.filter(q => q.line === ln && Math.abs(q.x - p.x) < 9 && Math.abs(q.y - p.y) < 9);

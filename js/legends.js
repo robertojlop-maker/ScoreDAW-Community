@@ -640,6 +640,7 @@
   };
   /** natural harmonics (12th fret) that belong to the chord or the scale */
   G.harm = function (S, T, len) {
+    if (S.ctx.mel?.harmonics === false) return G.hold(S, T, len, {});
     const tun = TUN(), cp = chordAt(S, T).pcs, sp = pcsAt(S, T, 'scale');
     const ok = [5, 4, 3, 2].filter(s => cp.includes(mod12(tun[s]))).concat([5, 4, 3, 2].filter(s => sp.includes(mod12(tun[s]))));
     if (!ok.length) return G.hold(S, T, len, {});
@@ -965,8 +966,14 @@
     const kl = ladder([an.key.root], lo, hi), tonic = kl[nearIdx(kl, center - 2)];
     const song = SDAW.store.song || {};
     const jazz = ctx.opts.genre === 'Jazz' || ctx.style?.melody?.licks === 'jazz';
-    const S = { ctx, an, R, hero, sec, lo, hi, center, bends: !jazz || ctx.mel?.bends === true, key: an.key.root, minor: an.key.mode === 'minor', tonic, p: center, notes: [], motifs: {}, tempo: song.tempo || 110,
-      emit(T, d, pitch, tech, x) { if (d > 0.01) this.notes.push(Object.assign({ T, d, pitch, tech: tech || {} }, x || {})); } };
+    const S = { ctx, an, R, hero, sec, lo, hi, center, bends: jazz ? ctx.mel?.bends === true : ctx.mel?.bends !== false, key: an.key.root, minor: an.key.mode === 'minor', tonic, p: center, notes: [], motifs: {}, tempo: song.tempo || 110,
+      emit(T, d, pitch, tech, x) {
+        tech = Object.assign({}, tech);
+        if (ctx.mel?.slides === false) delete tech.slide;
+        if (ctx.mel?.vibrato === false) { delete tech.vib; delete tech.wvib; }
+        if (ctx.mel?.harmonics === false) { delete tech.harm; delete tech.pinch; }
+        if (d > 0.01) this.notes.push(Object.assign({ T, d, pitch, tech }, x || {}));
+      } };
     const cx = ctx.opts.complexity === undefined ? 0.5 : ctx.opts.complexity;
     const hot = solo || sec.type === 'chorus';
     const play = (tpl, k, off) => { let T = k * BAR + (off || 0); tpl.forEach(([g, len, o]) => { (G[g] || G.rest)(S, T, len, o || {}); T += len; }); };
