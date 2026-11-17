@@ -223,6 +223,48 @@
   }
   const REST_GLYPH = { 16: '𝄻', 8: '𝄼', 4: '𝄽', 2: '𝄾', 1: '𝄿' };
 
+  const HEADER_FONT = 'Arial, sans-serif';
+  const headerMeasure = document.createElement('canvas').getContext('2d');
+
+  function headerLines(text, width, size, weight) {
+    headerMeasure.font = weight + ' ' + size + 'px ' + HEADER_FONT;
+    const fits = value => headerMeasure.measureText(value).width <= width;
+    const lines = [];
+    let line = '';
+    for (const word of text.trim().split(/\s+/)) {
+      if (line && fits(line + ' ' + word)) { line += ' ' + word; continue; }
+      if (line) lines.push(line);
+      line = '';
+      for (const letter of word) {
+        if (line && !fits(line + letter)) { lines.push(line); line = ''; }
+        line += letter;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function scoreHeader(L, song, track, isGuitar) {
+    const title = String(song.title || '').trim() || 'Untitled Song';
+    const tuning = isGuitar ? (track.type === 'bass' ? 'E A D G' : 'E A D G B E') : '';
+    const details = ['♩ = ' + song.tempo, song.key + ' ' + song.scale, tuning].filter(Boolean).join('   ·   ');
+    const right = L.systems[0]?.end ?? L.width - 24;
+    const x = (14 + right) / 2, width = right - 14 - 64;
+    const items = [];
+    let y = 60;
+    function addLines(text, size, weight, spacing, fill, className) {
+      for (const line of headerLines(text, width, size, weight)) {
+        items.push({ x, y, line, size, weight, fill, className });
+        y += spacing;
+      }
+    }
+    addLines(title, 32, 700, 38, INK, 'score-song-title');
+    y -= 11;
+    addLines(track.name, 15, 700, 22, INK, 'score-track-title');
+    addLines(details, 13, 400, 18, '#595974', 'score-metadata');
+    return { items, systemTop: y + 14 };
+  }
+
   /* ============================================================ RENDER == */
   nt.render = function () {
     if (!nt.printTarget) renderPalette();
@@ -340,16 +382,20 @@
     }));
     layoutMeasures(L, song, glist, rests);
     const lines = L.systems.length;
-    const H = lines * L.sysH + 30;
+    const header = scoreHeader(L, song, t, isGuitar);
+    L.systemTop = header.systemTop;
+    const H = L.systemTop + lines * L.sysH + 4;
     const root = svg('svg', { width: L.width, height: H, viewBox: `0 0 ${L.width} ${H}` });
     const add = (n) => { root.appendChild(n); return n; };
     const T = (x, y, txt, a) => add(svg('text', Object.assign({ x, y, fill: INK, 'font-size': 12 }, a || {}), txt));
-    T(LEFT, 18, song.title + ' — ' + t.name, { 'font-size': 15, 'font-weight': 700 });
-    T(L.width - 24, 18, '♩ = ' + song.tempo + '   ·   ' + song.key + ' ' + song.scale + (isGuitar ? '   ·   ' + (t.type === 'bass' ? 'E A D G' : 'E A D G B E') : ''), { 'font-size': 12, fill: FAINT, 'text-anchor': 'end' });
+    header.items.forEach(item => T(item.x, item.y, item.line, {
+      'font-family': HEADER_FONT, 'font-size': item.size, 'font-weight': item.weight,
+      fill: item.fill, class: item.className, 'text-anchor': 'middle'
+    }));
 
     /* ---------------------------------------------- staves and bars --- */
     for (let ln = 0; ln < lines; ln++) {
-      const y0 = 26 + ln * L.sysH;
+      const y0 = L.systemTop + ln * L.sysH;
       const staffTop = y0 + L.staffOff, staffBot = y0 + L.scoreBottomOff, tabTop = y0 + L.tabOff, tabBot = tabTop + (L.nStr - 1) * TAB_SP;
       const { bars, end: x1 } = L.systems[ln];
       const firstBar = bars[0].index, barsHere = bars.length;
@@ -422,7 +468,7 @@
     /* ----------------------------------------------------------- notes --- */
     const sel = new Set(nt.printTarget ? [] : s.sel.noteIds);
     rests.forEach(r => {
-      const bar = L.bars[r.bar], staffTop = 26 + bar.line * L.sysH + r.offset;
+      const bar = L.bars[r.bar], staffTop = L.systemTop + bar.line * L.sysH + r.offset;
       const x = r.centered ? bar.x + bar.width / 2 : tickX(L, r.tick);
       const y = staffTop + r.dy + (r.duration === 16 ? 12 : r.duration === 8 ? 20 : 26);
       T(x, y, REST_GLYPH[r.duration], { 'font-size': 26, class: 'music', fill: r.col, 'text-anchor': 'middle' });
@@ -433,7 +479,7 @@
     const tupletRuns = {};                // staff and voice -> [groups]
     function noteY(group, note) {
       const staff = staves[group.staff - 1];
-      return 26 + lineOf(L, group.start) * L.sysH + staff.offset + 40 -
+      return L.systemTop + lineOf(L, group.start) * L.sysH + staff.offset + 40 -
         (stepOf(written(note.pitch)) - stepOf(staff.bass ? 43 : 64)) * STEP;
     }
     beams.forEach(run => {
@@ -443,7 +489,7 @@
       run.forEach(g => { g.beamY = beamY; });
     });
     glist.forEach(g => {
-      const ln = lineOf(L, g.start), y0 = 26 + ln * L.sysH;
+      const ln = lineOf(L, g.start), y0 = L.systemTop + ln * L.sysH;
       const staff = staves[g.staff - 1];
       const staffTop = y0 + staff.offset, staffBot = staffTop + 40, tabTop = y0 + L.tabOff;
       const bottomStep = stepOf(staff.bass ? 43 : 64);
@@ -627,7 +673,7 @@
 
     /* ---------------------------------------------- cursor + playhead --- */
     if (nt.printTarget) { nt.L = L; paper.appendChild(root); return; }      // print: no cursor / playhead
-    const cl = lineOf(L, s.sel.cursor), cy0 = 26 + cl * L.sysH, cx = tickX(L, s.sel.cursor);
+    const cl = lineOf(L, s.sel.cursor), cy0 = L.systemTop + cl * L.sysH, cx = tickX(L, s.sel.cursor);
     const cTop = cy0 + (L.showScore ? L.staffOff - 14 : L.tabOff - 14);
     const cBot = cy0 + (L.showTab ? L.tabOff + (L.nStr - 1) * TAB_SP + 12 : L.scoreBottomOff + 14);
     const vc = VOICE_COLORS[s.sel.voice];
@@ -648,7 +694,7 @@
 
   /**
    * Render a track for printing / PDF (no cursor, no selection, fixed width).
-   * mode: 'score' | 'tab' | 'scoretab'. Returns { svg (markup), width, height, sysH, lines }.
+   * mode: 'score' | 'tab' | 'scoretab'. Returns { svg (markup), width, height, systemTop, sysH, lines }.
    */
   nt.renderForPrint = function (trackId, mode, width) {
     const s = SDAW.store, keep = { tid: s.sel.trackId, mode: nt.mode, L: nt.L, svgEl: nt.svgEl, pos: nt.pos, vnotes: nt.vnotes, ph: nt.playheadEl, sr: nt.selRect };
@@ -659,7 +705,7 @@
       const svgEl = box.querySelector('svg');
       if (!svgEl) return null;
       const L = nt.L, lines = L.systems.length;
-      return { svg: svgEl.outerHTML, inner: svgEl.innerHTML, width: L.width, height: +svgEl.getAttribute('height'), sysH: L.sysH, lines };
+      return { svg: svgEl.outerHTML, inner: svgEl.innerHTML, width: L.width, height: +svgEl.getAttribute('height'), sysH: L.sysH, systemTop: L.systemTop, lines };
     } finally {
       s.sel.trackId = keep.tid; nt.mode = keep.mode; nt.printTarget = null; nt.printWidth = null;
       nt.L = keep.L; nt.svgEl = keep.svgEl; nt.pos = keep.pos; nt.vnotes = keep.vnotes; nt.playheadEl = keep.ph; nt.selRect = keep.sr;
@@ -671,20 +717,23 @@
     const L = nt.L;
     if (!SDAW.audio.playing && tick === 0) { nt.playheadEl.setAttribute('opacity', 0); return; }
     if (SDAW.audio.patternMode) tick += (SDAW.app.patPreview ? SDAW.app.previewOffset : 0);
-    const ln = lineOf(L, tick), y0 = 26 + ln * L.sysH;
+    const ln = lineOf(L, tick), y0 = L.systemTop + ln * L.sysH;
     const x = tickX(L, Math.min(tick, SDAW.store.songTicks() - 0.01));
     nt.playheadEl.setAttribute('x1', x); nt.playheadEl.setAttribute('x2', x);
     nt.playheadEl.setAttribute('y1', y0 + (L.showScore ? L.staffOff - 16 : L.tabOff - 16));
     nt.playheadEl.setAttribute('y2', y0 + (L.showTab ? L.tabOff + (L.nStr - 1) * TAB_SP + 14 : L.scoreBottomOff + 16));
     nt.playheadEl.setAttribute('opacity', 1);
-    if (SDAW.audio.playing && nt.lastLine !== ln) { nt.lastLine = ln; $('#view-notation').scrollTop = Math.max(0, y0 - 10); }
+    if (SDAW.audio.playing && nt.lastLine !== ln) { nt.lastLine = ln; $('#view-notation').scrollTop = ln ? y0 - 10 : 0; }
   };
 
   nt.scrollToTick = function (tick) {
     const t = SDAW.store.selTrack(); if (!t) return;
     SDAW.store.setCursor(tick);
     const L = nt.L, view = $('#view-notation');
-    if (L && view) view.scrollTop = lineOf(L, tick) * L.sysH;
+    if (L && view) {
+      const line = lineOf(L, tick);
+      view.scrollTop = line ? L.systemTop + line * L.sysH - 10 : 0;
+    }
   };
 
   /* ============================================================ MOUSE == */
@@ -730,9 +779,9 @@
 
   function clickAt(p, target, e) {
     const s = SDAW.store, t = s.selTrack(), L = nt.L;
-    const ln = Math.floor((p.y - 26) / L.sysH);
+    const ln = Math.floor((p.y - L.systemTop) / L.sysH);
     if (ln < 0) return;
-    const y0 = 26 + ln * L.sysH;
+    const y0 = L.systemTop + ln * L.sysH;
     const bar = L.systems[ln]?.bars.find(b => p.x >= b.x && p.x < b.x + b.width);
     if (!bar) return;
     const offset = interpolate(bar.anchors, p.x - bar.x, 'x', 'tick');
@@ -1011,6 +1060,10 @@
   /* ============================================================ TOOLS == */
   nt.tools = function (box) {
     const s = SDAW.store;
+    box.appendChild(el('button', {
+      class: 'tool-btn labeled', 'data-help': 'Change the song title shown on the score and in exports',
+      onclick: () => SDAW.app.renameSong()
+    }, '✎ Edit title'));
     box.appendChild(el('button', { class: 'tool-btn labeled' + (nt.paletteOpen ? ' on' : ''), 'data-help': 'Show / hide the notation palette', onclick: () => { nt.paletteOpen = !nt.paletteOpen; nt.render(); SDAW.app.renderEditor(); } }, '🎼 Palette'));
     const pick = el('select', { class: 'track-pick', 'data-help': 'Track shown in the score / tab', onchange: e => s.selectTrack(e.target.value) },
       s.song.tracks.filter(t => t.type !== 'drums').map(t => el('option', { value: t.id, selected: t.id === s.sel.trackId ? true : null }, (SDAW.TRACK_ICONS[t.type] || '') + ' ' + t.name)));

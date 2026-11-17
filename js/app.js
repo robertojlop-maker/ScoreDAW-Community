@@ -427,7 +427,7 @@
   /* ======================================================== MENUS ===== */
   const MENUS = {
     File: [['New project…', 'Ctrl+N', () => app.showWelcome()], ['Open…', 'Ctrl+O', () => app.openFile()], ['Save', 'Ctrl+S', () => app.saveFile()], ['Save as…', 'Ctrl+Shift+S', () => app.saveFile(true)], null, ['⇪ Export…', 'Ctrl+E', () => SDAW.exporter.open()], ['Export audio (WAV / MP3)…', '', () => SDAW.exporter.open('audio')], ['Export MIDI…', '', () => SDAW.exporter.open('midi')], ['Export MusicXML (Guitar Pro / MuseScore)…', '', () => SDAW.exporter.open('xml')], ['Print / Save as PDF…', 'Ctrl+P', () => SDAW.exporter.open('print')], null,
-      ['Settings…', 'Ctrl+,', () => SDAW.settings.open()], ['Audio devices…', '', () => SDAW.settings.open('audio')], ['MIDI devices…', '', () => SDAW.settings.open('midi')], ['Library folders…', '', () => SDAW.settings.open('folders')], null, ['Song title…', '', () => SDAW.ask('Song title', SDAW.store.song.title, v => SDAW.store.mutate('Title', s => { s.title = v; }))]],
+      ['Settings…', 'Ctrl+,', () => SDAW.settings.open()], ['Audio devices…', '', () => SDAW.settings.open('audio')], ['MIDI devices…', '', () => SDAW.settings.open('midi')], ['Library folders…', '', () => SDAW.settings.open('folders')], null, ['Song title…', '', () => app.renameSong()]],
     Edit: [['Undo', 'Ctrl+Z', () => SDAW.store.undo()], ['Redo', 'Ctrl+Y', () => SDAW.store.redo()], null, ['Delete selected notes', 'Del', () => SDAW.store.deleteSelectedNotes()], ['Select all notes of track', 'Ctrl+A', () => selectAll()]],
     Track: [['Add track…', '', (e) => $('#btnAddTrack').click()], ['Duplicate selected track', '', () => dupTrack()], ['Delete selected track', '', () => delTrack()], null,
       ['New notes pattern', '', () => SDAW.store.newPattern('notes', 'Pattern ' + (SDAW.store.song.patterns.length + 1), SDAW.barTicks())], ['New drum pattern', '', () => SDAW.store.newPattern('drums', 'Beat ' + (SDAW.store.song.patterns.length + 1), SDAW.barTicks())],
@@ -471,6 +471,14 @@
     const t = $('#toast');
     t.textContent = msg; t.classList.add('show');
     clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
+  };
+
+  app.renameSong = function () {
+    const store = SDAW.store;
+    SDAW.ask('Song title', store.song.title || '', value => {
+      const title = value.trim();
+      if (title && title !== store.song.title) store.mutate('Title', song => { song.title = title; });
+    });
   };
 
   SDAW.ask = function (title, value, cb) {

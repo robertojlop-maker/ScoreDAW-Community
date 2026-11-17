@@ -551,7 +551,7 @@
       defs += `<g id="${id}">${r.inner}</g>`;
       body += `<section class="track${ti ? ' newpage' : ''}">`;
       for (let ln = 0; ln < r.lines; ln++) {
-        const y = ln === 0 ? 0 : 26 + ln * r.sysH, h = ln === 0 ? 26 + r.sysH : r.sysH;
+        const y = ln === 0 ? 0 : r.systemTop + ln * r.sysH, h = ln === 0 ? r.systemTop + r.sysH : r.sysH;
         body += `<svg class="sys" viewBox="0 ${y} ${r.width} ${h}" preserveAspectRatio="xMinYMin meet"><use href="#${id}"/></svg>`;
       }
       body += '</section>';
