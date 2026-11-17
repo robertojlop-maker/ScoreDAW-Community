@@ -112,6 +112,12 @@
    */
   SDAW.genPlay = function (A, track, pitch, time, dur, opts, dest) {
     const c = A.ctx;
+    // EVERY node of this note is listed here and disconnected when the note has ended (cleanup below).
+    // Before, the filters / gains of every played note stayed connected to the track for ever and the
+    // browser kept processing them: the audio load grew all through the song until the audio thread
+    // could not keep up and every track dropped out for a moment.
+    const nodes = [];
+    const N = n => { nodes.push(n); return n; };
     const P = Object.assign(SDAW.deepCopy(SDAW.GEN_DEFAULT), (track.params && track.params.gen) || {});
     const tech = opts.tech || {}, T = track.technique || {};
     const leadVoice = (P.preset === 'Lead Vocal' || P.preset === 'Female Vocal') && !!SDAW.FORMANTS[P.formant];
@@ -120,34 +126,35 @@
     const stopAt = end + P.r * 2.5 + 0.05;
 
     // amplitude envelope (ADSR)
-    const amp = c.createGain(), peak = 0.2 * vel * (P.gain || 0.8) * (leadVoice ? 1.5 : 1);
+    const amp = N(c.createGain()), peak = 0.2 * vel * (P.gain || 0.8) * (leadVoice ? 1.5 : 1);
     amp.gain.setValueAtTime(0.0001, time);
     amp.gain.linearRampToValueAtTime(peak, time + P.a);
     amp.gain.setTargetAtTime(Math.max(0.0001, peak * P.s), time + P.a, Math.max(0.005, P.d / 3));
     amp.gain.setTargetAtTime(0.0001, end, Math.max(0.005, P.r / 4));
+    amp.gain.setValueAtTime(0, stopAt);                 // the release curve ENDS (an endless curve keeps the node processing)
 
     // filter with envelope
-    const flt = c.createBiquadFilter(); flt.type = 'lowpass'; flt.Q.value = P.res;
+    const flt = N(c.createBiquadFilter()); flt.type = 'lowpass'; flt.Q.value = P.res;
     const cut = P.cutoff, top = Math.min(18000, cut * (1 + P.envAmt * 6));
     flt.frequency.setValueAtTime(cut, time);
     flt.frequency.linearRampToValueAtTime(top, time + P.a);
     flt.frequency.setTargetAtTime(Math.max(40, cut * (0.4 + 0.6 * P.s)), time + P.a, Math.max(0.01, P.d / 3));
     if (P.formant && SDAW.FORMANTS[P.formant]) {
       // voice: the filtered tone goes through the vowel's formant resonances (+ a little dry)
-      const fsum = c.createGain(); fsum.gain.value = leadVoice ? 3.0 : 2.2;
+      const fsum = N(c.createGain()); fsum.gain.value = leadVoice ? 3.0 : 2.2;
       const articulation = Math.min(0.11, dur * 0.45);
       SDAW.FORMANTS[P.formant].forEach(([f, g]) => {
-        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = f / (leadVoice ? 155 : 90);
+        const bp = N(c.createBiquadFilter()); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = f / (leadVoice ? 155 : 90);
         if (leadVoice) {
           // An opening vowel moves the resonances during the note attack.
           bp.frequency.setValueAtTime(f * 0.78, time);
           bp.frequency.linearRampToValueAtTime(f, time + articulation);
           bp.frequency.setTargetAtTime(f * 0.96, time + articulation, 0.12);
         }
-        const bg = c.createGain(); bg.gain.value = g;
+        const bg = N(c.createGain()); bg.gain.value = g;
         flt.connect(bp); bp.connect(bg); bg.connect(fsum);
       });
-      const dry = c.createGain(); dry.gain.value = leadVoice ? 0.05 : 0.12; flt.connect(dry); dry.connect(fsum);
+      const dry = N(c.createGain()); dry.gain.value = leadVoice ? 0.05 : 0.12; flt.connect(dry); dry.connect(fsum);
       fsum.connect(amp);
     } else flt.connect(amp);
     amp.connect(dest);
@@ -160,14 +167,14 @@
       let src;
       if (o.wave === 'noise') {
         if (!noiseBuf) { noiseBuf = c.createBuffer(1, c.sampleRate, c.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
-        src = c.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        src = N(c.createBufferSource()); src.buffer = noiseBuf; src.loop = true;
       } else {
-        src = c.createOscillator(); src.type = o.wave;
+        src = N(c.createOscillator()); src.type = o.wave;
         src.frequency.value = SDAW.midiToFreq(pitch + o.oct * 12);
         src.detune.value = o.det || 0;
         detuneTargets.push({ p: src.detune, base: o.det || 0 });
       }
-      const g = c.createGain(); g.gain.value = o.vol;
+      const g = N(c.createGain()); g.gain.value = o.vol;
       if (leadVoice && o.wave === 'noise') {
         g.gain.setValueAtTime(o.vol * 3, time);
         g.gain.setTargetAtTime(o.vol * 0.7, time + Math.min(0.03, dur * 0.2), 0.025);
@@ -192,7 +199,7 @@
     });
     // singer's vibrato: starts after the attack of long notes, deepens slowly
     if (P.voiceVib && dur > 0.32) {
-      const vl = c.createOscillator(), vg = c.createGain();
+      const vl = N(c.createOscillator()), vg = N(c.createGain());
       vl.frequency.value = 5.2 + Math.random() * 0.6;
       vg.gain.setValueAtTime(0, time);
       vg.gain.setValueAtTime(0, time + Math.min(0.28, dur * 0.35));
@@ -203,14 +210,19 @@
     // LFO (also used for the vibrato technique)
     const vibDepth = (tech.vib ? 25 : 0) + (tech.wvib ? 60 : 0);
     if (P.lfoDepth > 0 || vibDepth) {
-      const lfo = c.createOscillator(), lg = c.createGain();
+      const lfo = N(c.createOscillator()), lg = N(c.createGain());
       lfo.frequency.value = vibDepth ? (T.vibSpeed || 5.5) : P.lfoRate;
       lfo.connect(lg);
       if (vibDepth || P.lfoTo === 'pitch') { lg.gain.value = vibDepth || P.lfoDepth * 60; detuneTargets.forEach(d => lg.connect(d.p)); }
       else if (P.lfoTo === 'cutoff') { lg.gain.value = P.lfoDepth * cut * 0.9; lg.connect(flt.frequency); }
-      else { const trem = c.createGain(); trem.gain.value = 1; lg.gain.value = P.lfoDepth * 0.8; lg.connect(trem.gain); amp.disconnect(); amp.connect(trem); trem.connect(dest); }
+      else { const trem = N(c.createGain()); trem.gain.value = 1; lg.gain.value = P.lfoDepth * 0.8; lg.connect(trem.gain); amp.disconnect(); amp.connect(trem); trem.connect(dest); }
       lfo.start(time); lfo.stop(stopAt);
     }
+    // ---- cleanup: when the sources have stopped (end of the note, or Stop), the whole note leaves the graph
+    let cleaned = false;
+    const cleanup = () => { if (cleaned) return; cleaned = true; nodes.forEach(n => { try { n.disconnect(); } catch (e) { /* already gone */ } }); nodes.length = 0; };
+    if (oscs.length) oscs[oscs.length - 1].onended = cleanup;      // every source of the note stops at stopAt
+    else cleanup();                                                // no source (all volumes at 0): nothing to keep
   };
 
 })(window.SDAW);
