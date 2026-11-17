@@ -61,99 +61,132 @@
     return tech.ghost || note.tie ? '(' + label + ')' : label;
   }
 
-  const tabLabelWidth = label => label.length * 8 + 6;
+  const FLAG_COUNT = { e: 1, s: 2, t: 3, u: 4 };
+  const tabLabelWidth = label => label.length * 7.5 + 4;
 
-  // One horizontal position per onset, shared by all voices and by the tab.
+  // Spacing is constrained independently by the score, each tab string and the
+  // annotations above them. All voices still share the same rhythmic anchors.
   function layoutMeasures(L, song, groups, rests) {
     const B = BT();
     const columns = Array.from({ length: song.bars }, () => new Map());
-    function reserve(tick, left, right) {
-      const bar = Math.floor(tick / B);
-      if (!columns[bar]) return;
-      const offset = Math.round((tick - bar * B) * 1000) / 1000;
+    const marks = song.barMarks || {};
+    function reserve(tick, lane, left, right) {
+      const index = Math.floor(tick / B);
+      const bar = columns[index];
+      if (!bar) return;
+      const offset = Math.round((tick - index * B) * 1000) / 1000;
       if (offset >= B) return;
-      const column = columns[bar].get(offset) || { tick: offset, left: 0, right: 0 };
-      column.left = Math.max(column.left, left);
-      column.right = Math.max(column.right, right);
-      columns[bar].set(offset, column);
+      if (!bar.has(offset)) bar.set(offset, { tick: offset, ink: new Map() });
+      const ink = bar.get(offset).ink;
+      const previous = ink.get(lane) || { left: 0, right: 0 };
+      ink.set(lane, { left: Math.max(left, previous.left), right: Math.max(right, previous.right) });
     }
     groups.forEach(group => {
       const symbol = symbolFor(Math.max(...group.notes.map(baseDur)));
-      group.notes.forEach(n => {
-        const tech = n.tech || {};
-        let left = 0, right = 0;
+      const flagged = !group.beam && Boolean(FLAG_COUNT[symbol.sym]);
+      const lane = 'staff' + group.staff;
+      group.notes.forEach(note => {
+        const tech = note.tech || {};
         if (L.showScore) {
-          left = SDAW.isBlack(n.pitch) ? 23 : tech.ghost ? 16 : 10;
-          const flagged = ['e', 's', 't'].includes(symbol.sym);
-          right = flagged ? 24 : symbol.dot || tech.ghost ? 16 : 10;
+          const left = Math.max(SDAW.isBlack(note.pitch) ? 22 : tech.ghost ? 16 : 8, flagged && !group.stemUp ? 17 : 0);
+          const right = Math.max(symbol.dot || tech.ghost ? 16 : 8, flagged && group.stemUp ? 17 : 0);
+          reserve(group.start, lane, left, right);
         }
-        if (L.showTab && n.string !== undefined) {
-          const half = tabLabelWidth(tabLabel(n)) / 2;
-          left = Math.max(left, half, tech.slide ? 18 : 0);
-          right = Math.max(right, half, tech.bend ? 35 : tech.slide ? 19 : 0);
+        if (L.showTab && note.string !== undefined) {
+          const half = tabLabelWidth(tabLabel(note)) / 2;
+          const slide = tech.slide;
+          const left = Math.max(half, slide === 'inAbove' || slide === 'inBelow' ? 18 : 0);
+          const right = Math.max(half, tech.bend ? 29 : 0, slide === 'outUp' || slide === 'outDown' ? 19 : 0);
+          reserve(group.start, 'tab' + note.string, left, right);
+          if (tech.bend) reserve(group.start, 'tabBend', 3, 32);
+          if (tech.vib || tech.wvib) reserve(group.start, 'tabVibrato' + note.string, 0, 25);
         }
-        reserve(group.start, left, right);
       });
+      const top = group.notes[group.notes.length - 1];
+      const tech = top.tech || {};
+      if (L.showScore && (tech.vib || tech.wvib)) reserve(group.start, lane + 'vib', 5, 32);
+      if (L.showScore && top.dyn) reserve(group.start, lane + 'dyn', 6, 21);
+      if (L.showScore && tech.hair) reserve(group.start, lane + 'dyn', 0, 40);
+      if (L.showTab && tech.strum && group.notes.length > 2) {
+        for (let string = 0; string < L.nStr; string++) reserve(group.start, 'tab' + string, 17, 0);
+      }
+      if (L.showTab && (tech.ring || tech.pm || tech.harm || tech.pinch || tech.tap || tech.trem)) {
+        reserve(group.start, 'tabMark', 6, tech.ring ? 28 : 20);
+      }
     });
-    rests.forEach(r => { if (!r.centered) reserve(r.tick, 10, 10); });
-    song.chords.forEach(c => reserve(c.tick, 0, c.name.length * 8 + 5));
-    const avail = (nt.printWidth || (document.getElementById('editorBody') || {}).clientWidth || 1300) - paletteW();
-    const limit = avail - 64;
-    const bars = [], systems = [];
-    const marks = song.barMarks || {};
-    columns.forEach((byTick, index) => {
-      if (!byTick.has(0)) byTick.set(0, { tick: 0, left: 0, right: 0 });
+    rests.forEach(r => { if (!r.centered) reserve(r.tick, 'staff' + r.staff, 8, 8); });
+    song.chords.forEach(c => reserve(c.tick, 'chord', 0, c.name.length * 9 + 4));
+
+    const bars = columns.map((byTick, index) => {
+      if (!byTick.has(0)) byTick.set(0, { tick: 0, ink: new Map() });
       const anchors = [...byTick.values()].sort((a, b) => a.tick - b.tick);
-      let prev = anchors[0];
-      prev.x = Math.max(16, (marks[index]?.rs ? 19 : 6) + prev.left);
-      for (const next of anchors.slice(1)) {
-        const rhythm = 8 * Math.sqrt(next.tick - prev.tick);
-        next.x = prev.x + Math.max(rhythm, prev.right + next.left + 12);
-        prev = next;
-      }
-      const endSpace = marks[index]?.re ? 20 : 8;
-      const width = Math.ceil(Math.max(46, prev.x + prev.right + endSpace + Math.sqrt(B - prev.tick)));
-      anchors.push({ tick: B, x: width - endSpace });
-      bars.push({ index, width, anchors });
-    });
-
-    // A dense measure may require horizontal scrolling, but every system shares
-    // that same right margin. Never compress the minimum symbol spacing.
-    const rightEdge = Math.max(LEFT + 46, limit, ...bars.map(bar => LEFT + bar.width));
-    let system = { bars: [], end: LEFT };
-    bars.forEach(bar => {
-      if (system.bars.length && (system.bars.length >= CONFIG.ui.notationBarsPerLine || system.end + bar.width > rightEdge)) {
-        systems.push(system);
-        system = { bars: [], end: LEFT };
-      }
-      bar.line = systems.length;
-      system.bars.push(bar);
-      system.end += bar.width;
-    });
-    if (system.bars.length) systems.push(system);
-
-    systems.forEach(row => {
-      const naturalWidth = row.end - LEFT;
-      const extra = rightEdge - row.end;
-      let x = LEFT;
-      row.bars.forEach((bar, index) => {
-        const oldWidth = bar.width;
-        const addition = index === row.bars.length - 1
-          ? rightEdge - x - oldWidth
-          : extra * oldWidth / naturalWidth;
-        const firstX = bar.anchors[0].x;
-        const lastX = bar.anchors[bar.anchors.length - 1].x;
-        // Keep the leading and trailing margins, expanding only the space
-        // between rhythmic positions. Cursor and playback use these anchors too.
-        bar.anchors.forEach(anchor => {
-          anchor.x += addition * (anchor.x - firstX) / (lastX - firstX);
+      const edge = marks[index]?.rs ? 19 : 6;
+      const endSpace = marks[index]?.re ? 20 : 9;
+      const occupied = new Map();
+      let previous = null, right = 0;
+      anchors.forEach(anchor => {
+        anchor.x = previous ? previous.x + Math.max(8, 10 * Math.sqrt(anchor.tick - previous.tick)) : 14;
+        anchor.ink.forEach(({ left }, lane) => {
+          anchor.x = Math.max(anchor.x, edge + left, (occupied.get(lane) ?? -Infinity) + left + 4);
         });
+        anchor.ink.forEach((extent, lane) => {
+          const end = anchor.x + extent.right;
+          occupied.set(lane, end);
+          right = Math.max(right, end);
+        });
+        previous = anchor;
+      });
+      const tail = 8 + 4 * Math.sqrt(B - previous.tick);
+      const width = Math.ceil(Math.max(52, previous.x + tail + endSpace, right + endSpace));
+      const lastAnchor = Math.max(previous.x + 1, width - endSpace);
+      anchors.push({ tick: B, x: lastAnchor });
+      return { index, width, anchors };
+    });
+
+    // Fit more short measures per line and pick breaks that leave comparable
+    // amounts of white space. An oversized measure is kept intact.
+    const available = (nt.printWidth || document.getElementById('editorBody')?.clientWidth || 1300) - paletteW() - LEFT - 64;
+    const total = bars.reduce((sum, bar) => sum + bar.width, 0);
+    const lineWidth = Math.max(300, ...bars.map(bar => bar.width), Math.min(available, total));
+    const costs = new Array(bars.length + 1);
+    const breaks = new Array(bars.length);
+    costs[bars.length] = 0;
+    for (let i = bars.length - 1; i >= 0; i--) {
+      let width = 0;
+      costs[i] = Infinity;
+      for (let j = i; j < bars.length; j++) {
+        width += bars[j].width;
+        if (width > lineWidth) break;
+        const unused = (lineWidth - width) / lineWidth;
+        const cost = 1 + unused * unused * 3 + costs[j + 1];
+        if (cost < costs[i]) {
+          costs[i] = cost;
+          breaks[i] = j + 1;
+        }
+      }
+    }
+    const rightEdge = LEFT + lineWidth;
+    const systems = [];
+    for (let from = 0; from < bars.length; from = breaks[from]) {
+      const row = bars.slice(from, breaks[from]);
+      const naturalWidth = row.reduce((sum, bar) => sum + bar.width, 0);
+      const extra = lineWidth - naturalWidth;
+      let x = LEFT;
+      row.forEach((bar, index) => {
+        const added = index === row.length - 1 ? rightEdge - x - bar.width : extra * bar.width / naturalWidth;
+        const first = bar.anchors[0].x;
+        const last = bar.anchors[bar.anchors.length - 1];
+        // Leave the margins fixed, and bound the stretch between noteheads.
+        const spread = Math.min(added, (last.x - first) * .4);
+        bar.anchors.slice(0, -1).forEach(anchor => { anchor.x += spread * (anchor.x - first) / (last.x - first); });
+        last.x += added;
+        bar.line = systems.length;
         bar.x = x;
-        bar.width = oldWidth + addition;
+        bar.width += added;
         x += bar.width;
       });
-      row.end = rightEdge;
-    });
+      systems.push({ bars: row, end: rightEdge });
+    }
     Object.assign(L, { bars, systems, width: Math.max(420, rightEdge + 24) });
   }
 
@@ -178,9 +211,9 @@
 
   /** Drawable symbol for a written (base) duration */
   function symbolFor(d) {
-    const table = [[16, 'w', 0], [12, 'h', 1], [8, 'h', 0], [6, 'q', 1], [4, 'q', 0], [3, 'e', 1], [2, 'e', 0], [1.5, 's', 1], [1, 's', 0], [0.75, 't', 1], [0.5, 't', 0]];
+    const table = [[16, 'w', 0], [12, 'h', 1], [8, 'h', 0], [6, 'q', 1], [4, 'q', 0], [3, 'e', 1], [2, 'e', 0], [1.5, 's', 1], [1, 's', 0], [0.75, 't', 1], [0.5, 't', 0], [0.375, 'u', 1], [0.25, 'u', 0]];
     for (const [t, sym, dot] of table) if (d >= t - 0.01) return { sym, dot };
-    return { sym: 't', dot: 0 };
+    return { sym: 'u', dot: 0 };
   }
   const baseDur = (n) => n.tup ? n.dur * 1.5 : n.dur;
   function restsFor(start, len) {
@@ -260,7 +293,7 @@
             gaps.forEach(([gs, gl]) => {
               const full = gs - bs < 0.01 && gl >= BT() - 0.01;
               (full ? [[0, 16]] : restsFor(gs - bs, gl)).forEach(([rt, rv]) => {
-                rests.push({ bar: b, tick: bs + rt, duration: rv, offset, col, centered: full && !multi, dy: multi ? (v % 2 ? 10 : -8) : 0 });
+                rests.push({ bar: b, tick: bs + rt, duration: rv, staff: i + 1, offset, col, centered: full && !multi, dy: multi ? (v % 2 ? 10 : -8) : 0 });
               });
             });
           });
@@ -268,6 +301,43 @@
       });
     }
 
+    glist.forEach(group => {
+      const staff = staves[group.staff - 1];
+      const average = group.notes.reduce((sum, note) => sum + stepOf(written(note.pitch)), 0) / group.notes.length;
+      const multi = groupsInBar.get(barKey(group.staff, Math.floor(group.start / BT()))).size > 1;
+      group.stemUp = multi ? group.voice % 2 === 0 : average < stepOf(staff.bass ? 43 : 64) + 4;
+    });
+    // Beam consecutive equal short values inside a beat. This avoids crowding
+    // a fast run with individual flags and makes its beat boundaries visible.
+    const beams = [];
+    const meter = SDAW.timeSig(song);
+    const beat = 16 / meter.den * (meter.den === 8 && meter.num > 3 && meter.num % 3 === 0 ? 3 : 1);
+    if (L.showScore) groupsInBar.forEach(voices => voices.forEach(voiceGroups => {
+      let run = [];
+      function finish() {
+        if (run.length > 1) {
+          const up = run.filter(g => g.stemUp).length >= run.length / 2;
+          run.forEach(g => { g.stemUp = up; g.beam = run; });
+          beams.push(run);
+        }
+        run = [];
+      }
+      voiceGroups.forEach(g => {
+        g.duration = Math.max(...g.notes.map(baseDur));
+        const symbol = symbolFor(g.duration);
+        if (!FLAG_COUNT[symbol.sym] || symbol.dot || g.notes.some(n => n.tup)) {
+          finish();
+          return;
+        }
+        const previous = run[run.length - 1];
+        const offset = group => group.start % BT();
+        if (previous && (previous.duration !== g.duration ||
+          Math.floor((offset(previous) + .001) / beat) !== Math.floor((offset(g) + .001) / beat) ||
+          Math.abs(g.start - previous.start - previous.duration) > .01)) finish();
+        run.push(g);
+      });
+      finish();
+    }));
     layoutMeasures(L, song, glist, rests);
     const lines = L.systems.length;
     const H = lines * L.sysH + 30;
@@ -346,7 +416,7 @@
           }
         }
       }
-      song.chords.forEach(c => { if (lineOf(L, c.tick) === ln) T(tickX(L, c.tick), y0 + L.CH + 6, c.name, { 'font-size': 15, 'font-weight': 700 }); });
+      song.chords.forEach(c => { if (lineOf(L, c.tick) === ln) T(tickX(L, c.tick), y0 + L.CH - 2, c.name, { 'font-size': 15, 'font-weight': 700 }); });
     }
 
     /* ----------------------------------------------------------- notes --- */
@@ -361,6 +431,17 @@
     // previous note on the same voice (for slides, h/p, ties)
     const lastByVoice = new Map();
     const tupletRuns = {};                // staff and voice -> [groups]
+    function noteY(group, note) {
+      const staff = staves[group.staff - 1];
+      return 26 + lineOf(L, group.start) * L.sysH + staff.offset + 40 -
+        (stepOf(written(note.pitch)) - stepOf(staff.bass ? 43 : 64)) * STEP;
+    }
+    beams.forEach(run => {
+      const up = run[0].stemUp;
+      const ys = run.map(g => up ? Math.min(...g.notes.map(n => noteY(g, n))) : Math.max(...g.notes.map(n => noteY(g, n))));
+      const beamY = up ? Math.min(...ys) - 31 : Math.max(...ys) + 31;
+      run.forEach(g => { g.beamY = beamY; });
+    });
     glist.forEach(g => {
       const ln = lineOf(L, g.start), y0 = 26 + ln * L.sysH;
       const staff = staves[g.staff - 1];
@@ -370,7 +451,6 @@
       const n0 = g.notes[g.notes.length - 1];
       const dur = Math.max(...g.notes.map(baseDur));
       const sym = symbolFor(dur);
-      const multi = groupsInBar.get(barKey(g.staff, Math.floor(g.start / BT()))).size > 1;
       const vcol = multiVoiceTrack ? VOICE_COLORS[g.voice] : INK;
       const vk = voiceKey(g);
       const prev = lastByVoice.get(vk);
@@ -379,7 +459,7 @@
 
       if (L.showScore) {
         const ys = g.notes.map(n => staffBot - (stepOf(written(n.pitch)) - bottomStep) * STEP);
-        const up = multi ? g.voice % 2 === 0 : (ys.reduce((a, b) => a + b, 0) / ys.length) > staffTop + 20;
+        const up = g.stemUp;
         g.notes.forEach((n, i) => {
           const y = ys[i], step = stepOf(written(n.pitch)) - bottomStep;
           const col = sel.has(n.id) ? ACCENT : vcol;
@@ -419,10 +499,10 @@
         const col = g.notes.some(n => sel.has(n.id)) ? ACCENT : vcol;
         const sx = up ? x + 5.6 : x - 5.6;
         const yStart = up ? Math.max(...ys) : Math.min(...ys);
-        const yEnd = up ? Math.min(...ys) - 32 : Math.max(...ys) + 32;
+        const yEnd = g.beamY ?? (up ? Math.min(...ys) - 32 : Math.max(...ys) + 32);
         if (sym.sym !== 'w') {
           add(svg('line', { x1: sx, y1: yStart, x2: sx, y2: yEnd, stroke: col, 'stroke-width': 1.3 }));
-          const flags = { e: 1, s: 2, t: 3 }[sym.sym] || 0;
+          const flags = g.beam ? 0 : FLAG_COUNT[sym.sym] || 0;
           for (let f = 0; f < flags; f++) {
             const fy = yEnd + (up ? f * 7 : -f * 7);
             add(svg('path', { d: up ? `M${sx} ${fy} q 10 8 6 20` : `M${sx} ${fy} q 10 -8 6 -20`, fill: 'none', stroke: col, 'stroke-width': 2 }));
@@ -519,6 +599,17 @@
           add(svg('line', { x1: x - 13, y1: yA, x2: x - 13, y2: yB, stroke: '#666', 'stroke-width': 1 }));
           add(svg('path', { d: strum === 'down' ? `M${x - 16} ${yB - 5} L${x - 13} ${yB} L${x - 10} ${yB - 5}` : `M${x - 16} ${yA + 5} L${x - 13} ${yA} L${x - 10} ${yA + 5}`, fill: 'none', stroke: '#666', 'stroke-width': 1.2 }));
         }
+      }
+    });
+
+    beams.forEach(run => {
+      const first = run[0], last = run[run.length - 1];
+      const up = first.stemUp, side = up ? 5.6 : -5.6;
+      const left = tickX(L, first.start) + side, right = tickX(L, last.start) + side;
+      const flags = FLAG_COUNT[symbolFor(first.duration).sym];
+      for (let level = 0; level < flags; level++) {
+        const y = first.beamY + (up ? 1 : -1) * level * 4.8;
+        add(svg('line', { x1: left, x2: right, y1: y, y2: y, stroke: INK, 'stroke-width': 3 }));
       }
     });
 
