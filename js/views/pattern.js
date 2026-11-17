@@ -33,6 +33,26 @@
   const S = () => SDAW.store;
   const curBar = () => Math.floor(S().sel.cursor / BAR());
 
+  function rackTick(tick) {
+    const audio = SDAW.audio;
+    if (!audio.patternMode) return tick;
+    if (SDAW.app.patPreview) return tick + SDAW.app.previewOffset;
+    const store = S(), track = store.selTrack(), pattern = store.selPattern();
+    const clip = pattern && track?.clips.find(c => c.patternId === pattern.id);
+    return tick + (clip?.start ?? curBar() * BAR());
+  }
+
+  function viewedBar(tick = SDAW.audio.getTick()) {
+    if (!SDAW.audio.playing) return curBar();
+    return SDAW.clamp(Math.floor(rackTick(tick) / BAR()), 0, S().song.bars - 1);
+  }
+
+  function goToBar(bar) {
+    const tick = SDAW.clamp(bar, 0, S().song.bars - 1) * BAR();
+    S().setCursor(tick);
+    if (SDAW.audio.playing && !SDAW.audio.patternMode) SDAW.app.cueSong(tick);
+  }
+
   /** The block (clip + pattern + offset inside the pattern) of a track in a bar */
   function blockAt(t, bar) {
     const s = S(), c = s.clipAt(t, bar * BAR());
@@ -44,7 +64,7 @@
   /** Pattern shown by the editor tools (selected track at the cursor, else the selected pattern) */
   function current() {
     const s = S(), t = s.selTrack();
-    if (t) { const b = blockAt(t, curBar()); if (b) return b.p; }
+    if (t) { const b = blockAt(t, viewedBar()); if (b) return b.p; }
     const p = s.selPattern();
     if (p) return p;
     return s.song.patterns.find(x => x.kind === 'drums') || null;
@@ -74,31 +94,37 @@
   }
 
   /* ============================================================ RENDER == */
-  pat.render = function () {
+  pat.render = function (bar = viewedBar()) {
     const view = $('#view-pattern');
     view.innerHTML = '';
-    const s = S(), song = s.song, bar = curBar();
+    const s = S(), song = s.song;
+    pat.displayedBar = bar;
+    pat.lastStep = -1;
+    pat.highlighted = [];
     const sec = (song.sections || []).find(x => bar >= x.start && bar < x.start + x.length);
     const rk = el('div', { class: 'rack', style: '--steps:' + BAR() });   // one step column per 16th of the bar
 
     // ---- header: bar navigation, loop, add channel
     rk.appendChild(el('div', { class: 'rack-head' }, [
-      el('button', { class: 'tool-btn', 'data-help': 'Previous bar', onclick: () => s.setCursor(Math.max(0, bar - 1) * BAR()) }, '◀'),
+      el('button', { class: 'tool-btn', 'data-help': 'Previous bar', onclick: () => goToBar(bar - 1) }, '◀'),
       el('div', { class: 'rack-bar' }, [el('b', {}, 'Bar ' + (bar + 1)), sec ? el('span', { class: 'rack-sec', style: { background: sec.color || '#555' } }, sec.name) : null]),
-      el('button', { class: 'tool-btn', 'data-help': 'Next bar', onclick: () => s.setCursor(Math.min(song.bars - 1, bar + 1) * BAR()) }, '▶'),
+      el('button', { class: 'tool-btn', 'data-help': 'Next bar', onclick: () => goToBar(bar + 1) }, '▶'),
       el('button', { class: 'tool-btn labeled' + (rack.looping ? ' on' : ''), 'data-help': 'Loop this bar with ALL the channels (click again to stop)', onclick: toggleLoop }, rack.looping ? '■ Stop loop' : '🔁 Loop bar'),
       el('span', { class: 'spacer' }),
       el('span', { class: 'rack-hint' }, 'Drag a generator / instrument from the Library here = new channel · onto a channel = change its sound'),
       el('button', { class: 'btn small primary', 'data-help': 'Add a channel (instrument or generator)', onclick: addChannelMenu }, '＋ Channel')
     ]));
-    rk.appendChild(el('div', { class: 'rack-nums' }, [el('span'), el('span')].concat(Array.from({ length: BAR() }, (_, i) => { const bt = SDAW.beatTicks(); return el('span', { class: i % bt === 0 ? 'beat' : '' }, i % bt === 0 ? String(i / bt + 1) : '·'); }))));
+    const beat = SDAW.beatTicks();
+    const numbers = Array.from({ length: BAR() }, (_, i) =>
+      el('span', { class: i % beat === 0 ? 'beat' : '', 'data-step': i }, i % beat === 0 ? String(i / beat + 1) : '·'));
+    rk.appendChild(el('div', { class: 'rack-nums' }, [el('span'), el('span'), el('div', { class: 'seq-steps' }, numbers)]));
 
     if (!song.tracks.length) rk.appendChild(el('div', { class: 'empty-msg' }, 'No channels yet — drag a generator from the Library here or press ＋ Channel.'));
     song.tracks.forEach(t => { if (t.type === 'drums') drumChannel(rk, t, bar); else noteChannel(rk, t, bar); });
     view.appendChild(rk);
 
     // drop on the rack = new channel (generator / instrument), grooves / kits on the selected drum track
-    SDAW.makeDropTarget(view, 'instrument finst rhythm kit', async pl => {
+    SDAW.makeDropTarget(rk, 'instrument finst rhythm kit', async pl => {
       if (pl.kind === 'instrument') { const t = SDAW.addTrackFromInstrument(pl); rack.open[t.id] = true; return; }
       if (pl.kind === 'finst') return SDAW.factory.applyInstrument(pl.instId, null);
       const dt = s.selTrack() && s.selTrack().type === 'drums' ? s.selTrack() : song.tracks.find(x => x.type === 'drums');
@@ -207,8 +233,15 @@
     const s = S();
     if (rack.open[t.id] === undefined) rack.open[t.id] = s.sel.trackId === t.id || !s.song.tracks.some(x => x.type === 'drums' && rack.open[x.id]);
     const toggle = () => { rack.open[t.id] = !rack.open[t.id]; pat.render(); };
-    const { name, tools, block } = channelHead(t, bar, { toggle });
-    const val = (row, i) => (block && block.p.kind === 'drums') ? (block.p.drum.rows[row] || [])[(block.off + i) % block.p.length] || 0 : 0;
+    const { name, tools } = channelHead(t, bar, { toggle });
+    const slots = Array.from({ length: BAR() }, (_, i) => {
+      const tick = bar * BAR() + i, clip = s.clipAt(t, tick);
+      if (clip?.kind !== 'pattern') return null;
+      const pattern = s.pattern(clip.patternId);
+      if (pattern?.kind !== 'drums' || !pattern.length) return null;
+      return { pattern, step: (tick - clip.start + (clip.offsetTicks || 0)) % pattern.length };
+    });
+    const val = (row, i) => slots[i]?.pattern.drum.rows[row]?.[slots[i].step] || 0;
     // compact summary (all pads together)
     const steps = el('div', { class: 'seq-steps rack-steps' });
     for (let i = 0, N = BAR(); i < N; i++) {
@@ -217,12 +250,12 @@
         style: on.length ? { background: `linear-gradient(${on.map(r => r.color).join(',')}${on.length === 1 ? ',' + on[0].color : ''})`, color: on[0].color } : null,
         'data-help': on.length ? on.map(r => r.name).join(' + ') : 'Open the channel (▸) to edit its pads', onmousedown: toggle }));
     }
-    rk.appendChild(el('div', { class: 'rack-row drum' + (t.mute ? ' muted' : '') }, [name, tools, steps]));
+    rk.appendChild(el('div', { class: 'rack-row drum' + (t.mute ? ' muted' : ''), 'data-drum-track': t.id }, [name, tools, steps]));
     if (!rack.open[t.id]) return;
     // pads
     const pads = SDAW.DRUM_ROWS.filter(r => {
-      if (!block || block.p.kind !== 'drums') return true;
-      const any = (block.p.drum.rows[r.id] || []).some(v => v > 0);
+      if (!slots.some(Boolean)) return true;
+      const any = slots.some((_, i) => val(r.id, i) > 0);
       return any || ['kick', 'snare', 'hhc', 'hho', 'clap', 'crash'].includes(r.id) || (t.drumMap && t.drumMap[r.id]);
     });
     pads.forEach(r => {
@@ -243,12 +276,16 @@
         ps.appendChild(el('div', { class: 'step' + (i % SDAW.beatTicks() === 0 ? ' beat' : '') + (v ? ' on' : ''), 'data-step': i,
           style: v ? { background: r.color, opacity: 0.45 + v * 0.55, color: r.color, borderColor: '#fff4' } : null,
           onmousedown: e => {
-            const b = ensureDrumBlock(t, bar); const arr = b.p.drum.rows[r.id], k = (b.off + i) % b.p.length;
+            const slot = slots[i];
+            const block = slot ? null : ensureDrumBlock(t, bar);
+            const pattern = slot ? slot.pattern : block.p;
+            const k = slot ? slot.step : (block.off + i) % pattern.length;
+            const arr = pattern.drum.rows[r.id];
             s.mutate('Step', () => { arr[k] = arr[k] ? (e.shiftKey && arr[k] < 1 ? 1 : 0) : (e.shiftKey ? 1 : 0.75); });
             if (arr[k]) SDAW.audio.previewDrum(t, r.id);
           } }));
       }
-      rk.appendChild(el('div', { class: 'rack-row pad' }, [pname, el('div'), ps]));
+      rk.appendChild(el('div', { class: 'rack-row pad', 'data-drum-track': t.id, 'data-pad': r.id }, [pname, el('div'), ps]));
     });
   }
 
@@ -277,7 +314,7 @@
     rack.barLoop = rack.previousLoop = null;
   }
   function toggleLoop() {
-    const A = SDAW.audio, bar = curBar();
+    const A = SDAW.audio, bar = viewedBar();
     if (rack.looping) { endLoop(); A.stop(); SDAW.app.syncTransport(); pat.render(); return; }
     if (A.playing || A.preparing) A.stop();
     A.patternMode = false;
@@ -326,11 +363,11 @@
     box.appendChild(el('select', { 'data-help': 'Length of the notes a step writes', onchange: e => { rack.stepLen = +e.target.value; } },
       [[1, '1/16'], [2, '1/8'], [4, '1/4'], [8, '1/2']].map(([v, l]) => el('option', { value: v, selected: rack.stepLen === v ? true : null }, l))));
     if (t && t.type === 'drums') {
-      box.appendChild(el('select', { 'data-help': 'Load a style groove into this bar of the selected drum channel', onchange: e => { if (e.target.value) { const b = ensureDrumBlock(t, curBar()); SDAW.loadGrooveInto(b.p, e.target.value); } } },
+      box.appendChild(el('select', { 'data-help': 'Load a style groove into this bar of the selected drum channel', onchange: e => { if (e.target.value) { const b = ensureDrumBlock(t, viewedBar()); SDAW.loadGrooveInto(b.p, e.target.value); } } },
         [el('option', { value: '' }, 'Groove…')].concat(CONFIG.library.genres.map(g => el('option', { value: g }, g)))));
     }
     if (t) box.appendChild(el('button', { class: 'tool-btn labeled', 'data-help': 'Clear the selected channel in this bar', onclick: () => {
-      const b = blockAt(t, curBar()); if (!b) return;
+      const b = blockAt(t, viewedBar()); if (!b) return;
       s.mutate('Clear bar', () => {
         if (b.p.kind === 'drums') SDAW.DRUM_ROWS.forEach(r => { for (let i = 0, N = BAR(); i < N; i++) b.p.drum.rows[r.id][(b.off + i) % b.p.length] = 0; });
         else b.p.notes = b.p.notes.filter(n => n.start < b.off || n.start >= b.off + BAR());
@@ -354,12 +391,33 @@
   };
 
   pat.updatePlayhead = function (tick) {
-    let step = -1;
-    if (SDAW.audio.playing && (SDAW.audio.patternMode || Math.floor(tick / BAR()) === curBar())) step = Math.floor(tick) % BAR();
+    const audio = SDAW.audio, bar = viewedBar(tick);
+    if (pat.displayedBar !== bar) pat.render(bar);
+    const step = audio.playing ? Math.floor(rackTick(tick)) % BAR() : -1;
     if (pat.lastStep === step) return;
     pat.lastStep = step;
-    SDAW.$$('#view-pattern .step.now').forEach(n => n.classList.remove('now'));
-    if (step >= 0) SDAW.$$('#view-pattern .step[data-step="' + step + '"]').forEach(n => n.classList.add('now'));
+    const rackNode = $('#view-pattern .rack');
+    rackNode?.classList.toggle('following', step >= 0);
+    (pat.highlighted || []).forEach(n => n.classList.remove('now', 'now-hit'));
+    pat.highlighted = [];
+    if (step < 0 || !rackNode) return;
+
+    const solo = S().song.tracks.some(t => t.solo);
+    const hits = new Map();
+    for (const event of audio.index?.[Math.floor(tick)] || []) {
+      const track = event.track;
+      if (!event.drum || track.mute || (solo && !track.solo)) continue;
+      if (!hits.has(track.id)) hits.set(track.id, new Set());
+      hits.get(track.id).add(event.drum);
+    }
+    pat.highlighted = [...rackNode.querySelectorAll('[data-step="' + step + '"]')];
+    for (const cell of pat.highlighted) {
+      cell.classList.add('now');
+      const row = cell.closest('[data-drum-track]');
+      if (!row) continue;
+      const pads = hits.get(row.dataset.drumTrack);
+      if (pads && (!row.dataset.pad || pads.has(row.dataset.pad))) cell.classList.add('now-hit');
+    }
   };
 
 })(window.SDAW);

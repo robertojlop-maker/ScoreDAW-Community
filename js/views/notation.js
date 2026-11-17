@@ -682,7 +682,7 @@
       const cs = SDAW.clamp(s.sel.cursorString, 0, L.nStr - 1);
       add(svg('rect', { x: cx - 9, y: cy0 + L.tabOff + (L.nStr - 1 - cs) * TAB_SP - 7, width: 18, height: 14, rx: 3, fill: 'none', stroke: '#e0a000', 'stroke-width': 2 }));
     }
-    nt.playheadEl = svg('line', { x1: 0, y1: 0, x2: 0, y2: 0, stroke: '#ff4fd8', 'stroke-width': 2, opacity: 0 });
+    nt.playheadEl = svg('line', { x1: 0, y1: 0, x2: 0, y2: 0, stroke: '#e00098', 'stroke-width': 3, opacity: 0, 'pointer-events': 'none', class: 'score-playhead' });
     add(nt.playheadEl);
     nt.selRect = svg('rect', { x: 0, y: 0, width: 0, height: 0, fill: 'rgba(155,92,255,.12)', stroke: ACCENT, 'stroke-dasharray': '4 3', opacity: 0 });
     add(nt.selRect);
@@ -723,7 +723,29 @@
     nt.playheadEl.setAttribute('y1', y0 + (L.showScore ? L.staffOff - 16 : L.tabOff - 16));
     nt.playheadEl.setAttribute('y2', y0 + (L.showTab ? L.tabOff + (L.nStr - 1) * TAB_SP + 14 : L.scoreBottomOff + 16));
     nt.playheadEl.setAttribute('opacity', 1);
-    if (SDAW.audio.playing && nt.lastLine !== ln) { nt.lastLine = ln; $('#view-notation').scrollTop = ln ? y0 - 10 : 0; }
+    if (SDAW.audio.playing) keepPlayheadVisible(x, y0, L);
+  };
+
+  function keepPlayheadVisible(x, systemTop, L) {
+    const view = $('#view-notation');
+    const bounds = view.getBoundingClientRect(), paper = nt.svgEl.getBoundingClientRect();
+    if (!paper.width || !view.clientHeight) return;
+    const scale = paper.width / L.width;
+    const left = bounds.left + paletteW() * scale, right = bounds.left + view.clientWidth * scale;
+    const top = bounds.top, bottom = top + view.clientHeight * scale;
+    const px = paper.left + x * scale;
+    const staff = paper.top + (systemTop + (L.showScore ? L.staffOff : L.tabOff)) * scale;
+    const staffEnd = staff + (L.grandStaff ? L.scoreBottomOff - L.staffOff : L.showScore ? 40 : (L.nStr - 1) * TAB_SP) * scale;
+    const margin = 28 * scale;
+    if (right - left > 2 * margin) {
+      if (px < left + margin) view.scrollLeft -= (left + margin - px) / scale;
+      else if (px > right - margin) view.scrollLeft += (px - right + margin) / scale;
+    }
+    const upper = paper.top + (systemTop + (L.showScore ? Math.max(0, L.staffOff - 52) : L.tabOff - 32)) * scale;
+    if (upper < top + 4 * scale || staffEnd > bottom - 8 * scale) {
+      const target = view.scrollTop + (upper - top) / scale - 10;
+      view.scrollTop = Math.max(0, target);
+    }
   };
 
   nt.scrollToTick = function (tick) {
