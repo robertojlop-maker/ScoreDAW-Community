@@ -700,4 +700,41 @@
     lead: ['Trumpet', 'Trombone', 'Alto Sax', 'Tenor Sax', 'Flute', 'Accordion', 'Fiddle', 'Harmonica', 'Melodica', 'Electric Guitar - Lead', 'Electric Guitar - Clean', 'Classical Guitar - Nylon', 'Saw Lead', 'Square Lead', 'Grand Piano', 'Vibraphone']
   };
 
+
+  // Acoustic arrangements informed by all 113 Guitar Pro reference files.
+  STYLES.Rock.types = {
+    electric: { n: 'Electric Rock', w: 4 },
+    acoustic: {
+      n: 'Acoustic Guitar', w: 1,
+      d: 'Acoustic rock: picked verses, open chorus strumming, melodic solos, bass, restrained drums and piano.',
+      set: {
+        reference: 'acoustic', tempo: [72, 120, 96],
+        structures: {
+          Short: 'Intro:4 Verse:8 Chorus:8 Solo:8 Chorus:8 Outro:4',
+          Standard: 'Intro:8 Verse:8 Chorus:8 Verse:8 Chorus:8 Bridge:8 Solo:8 Chorus:8 Outro:4',
+          Extended: 'Intro:8 Verse:16 Chorus:8 Verse:16 Chorus:8 Bridge:8 Solo:16 Chorus:8 Outro:8'
+        },
+        melody: { heroes: ['harrison', 'clapton', 'gilmour'], scales: STYLES.Rock.melody.scales }
+      },
+      tracks: {
+        rhythm: { inst: 'Acoustic Guitar - Steel', fx: 'Room', vol: 0.7, play: 'mix',
+          plays: ['mix', 'arp', 'strum', 'boomchick', 'arpriff', 'bassriff'],
+          mixPool: { intro: ['arp', 'arpriff'], verse: ['arp', 'boomchick', 'arpriff'], pre: ['strum'],
+            chorus: ['strum', 'boomchick'], bridge: ['arp', 'bassriff'], solo: ['strum', 'arp'], outro: ['arp'] },
+          p: { arp: { verse: '0.2.1.3.0.2.1.3.', intro: '0.1.2.3.2.1.2.3.' },
+            strum: { verse: 'D...D.U...U.D.U.', chorus: 'D.DU.UDUD.DU.UDU', outro: 'D.......D.......' } } },
+        rhythm2: { on: true, inst: 'Acoustic Guitar - Steel', fx: 'Room', vol: 0.38,
+          play: 'strum', plays: ['strum', 'arp', 'boomchick'],
+          in: { intro: 0, verse: 0, pre: 0.5, chorus: 1, bridge: 0, solo: 0.5, outro: 0 } },
+        bass: { inst: 'Electric Bass - Finger', vol: 0.65, in: { intro: 0, verse: 1, chorus: 1, bridge: 0.5, solo: 1, outro: 0.5 } },
+        drums: { vol: 0.55, in: { intro: 0, verse: 0.5, chorus: 1, bridge: 0.5, solo: 1, outro: 0.5 } },
+        organ: { name: 'Piano', inst: 'Grand Piano', on: true, play: 'chords', fx: 'Room', vol: 0.36,
+          in: { intro: 0, verse: 0, pre: 0.5, chorus: 1, bridge: 1, solo: 0.5, outro: 0.5 } },
+        lead: { inst: 'Acoustic Guitar - Steel', fx: 'Room', vol: 0.72,
+          in: { intro: 0.5, verse: 0.5, pre: 0, chorus: 0.5, bridge: 0.5, solo: 1, outro: 1 },
+          mel: { bends: false, slides: true, harmonics: true, vibrato: true, fast: false } }
+      }
+    }
+  };
+
 })(window.SDAW);

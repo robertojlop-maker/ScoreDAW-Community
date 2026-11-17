@@ -798,7 +798,8 @@
   SG.styleOf = function (opts) {
     let st = SDAW.STYLES[opts.genre] || SDAW.STYLES.Pop;
     if (st.types) st = SG.typedStyle(st, SG.typeOf(st, opts));
-    if (opts.ref && !st.band) st = SG.applyRef(st, opts.ref, opts.mode, opts.seed || 1);
+    const reference = opts.ref || st.reference;
+    if (reference && !st.band) st = SG.applyRef(st, reference, opts.mode, opts.seed || 1);
     return st;
   };
   SG.defaults = function (genre, seed, songType) {
@@ -818,7 +819,7 @@
     const tracks = {};
     st.tracks.forEach(t => { tracks[t.id] = { on: t.on !== false, inst: t.inst, play: t.play || null, fx: t.fx || 'Room' }; });
     const lead = st.tracks.find(t => t.lead) || {};
-    return { genre, key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 1, density: 1, seed, progs: {}, tracks,
+    return { genre, songType: st.type || 'auto', key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 1, density: 1, seed, progs: {}, tracks,
       vocals: 'instrumental', voice: 'auto', choir: 'auto', leadPlan: {},
       melody: Object.assign({ complex: false, fast: false, triplets: false, modes: false, slides: false, harmonics: false, bends: false, vibrato: true, hero: 'auto' }, lead.mel || {}) };
   };
