@@ -401,9 +401,18 @@
           // tie arc to the previous same-pitch note
           if (n.tie && prev) {
             const pn = prev.notes.find(q => q.pitch === n.pitch);
-            if (pn && lineOf(L, prev.start) === ln) {
+            if (pn) {
+              const prevLine = lineOf(L, prev.start);
               const px = tickX(L, prev.start), cy = y + (up ? 9 : -9);
-              add(svg('path', { d: `M${px + 4} ${cy} Q ${(px + x) / 2} ${cy + (up ? 9 : -9)} ${x - 4} ${cy}`, fill: 'none', stroke: col, 'stroke-width': 1.3 }));
+              const arc = (x1, x2, y1) => {
+                if (x2 <= x1) return;
+                add(svg('path', { d: `M${x1} ${y1} Q ${(x1 + x2) / 2} ${y1 + (up ? 9 : -9)} ${x2} ${y1}`, fill: 'none', stroke: col, 'stroke-width': 1.3 }));
+              };
+              if (prevLine === ln) arc(px + 4, x - 4, cy);
+              else {
+                arc(px + 4, L.systems[prevLine].end - 2, cy - (ln - prevLine) * L.sysH);
+                arc(tickBar(L, g.start).x + 2, x - 4, cy);
+              }
             }
           }
         });

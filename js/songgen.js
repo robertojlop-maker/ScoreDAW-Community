@@ -623,7 +623,11 @@
 
     // final bar of the song: one long chord
     if (c.finalBar) {
-      const ch = chAt(0);
+      let ch = chAt(0);
+      // Four voices are available: preserve the third and color tones by omitting the fifth.
+      if (ctx.style.ending === 'jazz' && ch.intervals.length > 4) {
+        ch = Object.assign({}, ch, { intervals: ch.intervals.slice(0, 2).concat(ch.intervals.filter(i => i > 7).slice(-2)) });
+      }
       if (gtr) addStr(0, 16, strings(ch), vel0 + 6, { strum: 'down', ring: true });
       else addKeys(0, 16, voicing(ctx, ch), vel0 + 4);
       return out;
@@ -799,7 +803,7 @@
     let st = SDAW.STYLES[opts.genre] || SDAW.STYLES.Pop;
     if (st.types) st = SG.typedStyle(st, SG.typeOf(st, opts));
     const reference = opts.ref || st.reference;
-    if (reference && !st.band) st = SG.applyRef(st, reference, opts.mode, opts.seed || 1);
+    if (reference && (!st.band || st.reference)) st = SG.applyRef(st, reference, opts.mode, opts.seed || 1);
     return st;
   };
   SG.defaults = function (genre, seed, songType) {
@@ -879,6 +883,7 @@
     const base = SDAW.STYLES[genre];
     const o = SG.defaults(genre, seed, type || (base.types && Object.keys(base.types)[0]));
     const hero = o.melody.hero;
+    if (base.band && base.reference) return Object.assign(o, { extras: [], ending: 'auto' });
     if (base.band || genre === 'Jazz') {
       const artist = SG.artistPreset(o, hero);
       // Keep the selected band and its arrangement, even when several bands share a guitarist.
@@ -1110,9 +1115,43 @@
       m[sec].slice(0, 4).forEach(([c]) => { if (!progs.some(p => p.c === c && p.use === use)) progs.push({ n: '★ ' + short + ': ' + c, m: mode, use, c }); });
     });
     const hero = SDAW.legends && SDAW.legends.HEROES[a.hero] ? a.hero : null;
-    return Object.assign({}, st, { tracks, progs: progs.concat(st.progs), ref,
+    return Object.assign({}, st, { tracks, progs: st.preferAuthoredHarmony ? st.progs.concat(progs) : progs.concat(st.progs), ref,
       melody: hero ? Object.assign({}, st.melody, { heroes: [hero] }) : st.melody });
   };
+
+  /** Extend the written cadence inside one pattern so playback merges the tied notes. */
+  function sustainEnding(song, specs) {
+    const end = song.bars * BAR;
+    const starting = new Map(song.patterns.map(p => [p.id, p]));
+    const roles = new Map(specs.map(spec => [spec.id, spec.role]));
+    const extended = new Set();
+    song.tracks.forEach(track => {
+      if (['drums', 'vocal', 'choir'].includes(roles.get(track.styleTrack))) return;
+      const clip = track.clips.find(c => c.kind === 'pattern' && c.start === end - BAR && c.len === BAR);
+      if (!clip) return;
+      const source = starting.get(clip.patternId);
+      if (source?.kind !== 'notes') return;
+      const held = source.notes.filter(n => Math.abs(n.start + n.dur - BAR) < 1e-5);
+      if (!held.length) return;
+      const pattern = SDAW.makePattern('notes', source.name, BAR * 2, source.color);
+      pattern.notes = source.notes.map(n => {
+        const note = Object.assign(SDAW.deepCopy(n), { id: SDAW.uid('n') });
+        if (held.includes(n) && note.tech) delete note.tech.ring;
+        return note;
+      });
+      held.forEach(n => pattern.notes.push(Object.assign({}, n, {
+        id: SDAW.uid('n'), start: BAR, dur: BAR, tie: true, tech: {}
+      })));
+      extended.add(source.id);
+      song.patterns.push(pattern);
+      clip.patternId = pattern.id;
+      clip.len = pattern.length;
+    });
+    const used = new Set(song.tracks.flatMap(track => track.clips.map(clip => clip.patternId)));
+    song.patterns = song.patterns.filter(p => !extended.has(p.id) || used.has(p.id));
+    song.bars++;
+    song.sections[song.sections.length - 1].length++;
+  }
 
   /** Build a new song object (does not touch the current song) */
   SG.createSong = function (opts) {
@@ -1170,7 +1209,7 @@
           // in root position (extensions such as Imaj7, I6, i7, I9 are kept). An open ending of the
           // style (st.openEnding) is respected.
           const parts = tok.split('-'), lastH = parts[parts.length - 1];
-          if (!SG.isTonic(lastH, keyRoot)) { parts[parts.length - 1] = mode === 'minor' ? 'i' : 'I'; tok = parts.join('-'); }
+          tok = SG.isTonic(lastH, keyRoot) ? lastH : (mode === 'minor' ? 'i' : 'I');
         }
         tok.split('-').forEach((h, hi, arr) => {
           const name = SG.romanToName(h, keyRoot, flats);
@@ -1212,6 +1251,7 @@
           melody: leadish ? (sp.lead ? Object.assign({}, opts.melody, SG.planActive(opts.leadPlan) ? { plan: Object.assign({}, opts.leadPlan) } : {}) : Object.assign({}, opts.melody, sp.mel || {})) : null
         });
       });
+      sustainEnding(song, specs);
     } finally { s.song = prev; }
     return song;
   };
