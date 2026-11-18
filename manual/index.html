@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Manual de usuario · ScoreDAW</title>
-<link rel="stylesheet" href="manual.css">
+<link rel="stylesheet" href="manual.css?v=manual-20261118">
 </head>
 <body id="arriba">
 <a class="skip-link button" href="#contenido">Ir al contenido</a>
@@ -22,6 +22,7 @@
 <a href="#entrada">6. Escribir música</a>
 <a href="#editores">7. Editores y partitura</a>
 <a href="#generacion">8. Generar música</a>
+<a href="#clasica">8.1. Clásica y cuerdas</a>
 <a href="#sonido">9. Inspector, mezcla y efectos</a>
 <a href="#grabacion">10. Grabar y conectar MIDI</a>
 <a href="#exportacion">11. Guardar, exportar e imprimir</a>
@@ -32,7 +33,7 @@
 </aside>
 <main id="contenido">
 <header class="hero">
-<span class="version">ScoreDAW · versión 0.2.0</span>
+<span class="version">ScoreDAW · versión 0.2.0 · Manual actualizado el 18 de noviembre de 2026</span>
 <h1>Manual de usuario</h1>
 <p>Escribe, genera, graba y mezcla una canción. Usa el índice para aprender por pasos o localizar un control. Los nombres en negrita coinciden con los que verás en la interfaz en inglés.</p>
 <div class="actions"><a class="button primary" href="#inicio">Crear mi primera canción</a><a class="button" href="#menus">Consultar menús y atajos</a></div>
@@ -41,12 +42,12 @@
 <section id="inicio"><h2>1. Crea tu primera canción</h2>
 <ol>
 <li>Abre <strong>File → New project</strong>. En la bienvenida puedes empezar con un estilo, escribir para guitarra, hacer un ritmo, abrir un proyecto o crear un proyecto vacío.</li>
-<li>Elige <strong>Start with a style</strong> y un género. Usa <strong>Choose everything…</strong> si quieres escoger instrumentos, tonalidad y estructura antes de generar.</li>
+<li>En <strong>Start with a style</strong>, usa las pestañas <strong>Genre</strong>, <strong>Band</strong> o <strong>Guitarist</strong> y su desplegable para elegir. Los estilos están ordenados alfabéticamente y los géneros se agrupan por familia. Usa <strong>Choose everything…</strong> si quieres escoger instrumentos, tonalidad y estructura antes de generar.</li>
 <li>Pulsa <kbd>Espacio</kbd> o <strong>Play</strong>. En <strong>Song / Arrange</strong> verás las pistas y el cursor de reproducción.</li>
 <li>Selecciona un bloque de guitarra y abre <strong>Score + Tab</strong>. Usa <strong>✎ Edit title</strong> para ponerle nombre a la canción.</li>
 <li>Guárdala con <strong>File → Save as</strong>. Para compartirla como audio, usa <strong>File → Export audio</strong>.</li>
 </ol>
-<figure><a href="images/inicio.png"><img src="images/inicio.png" alt="Bienvenida con las opciones para generar un estilo, escribir para guitarra y crear un ritmo"></a><figcaption>La bienvenida ofrece plantillas, un proyecto vacío y el ajuste del compás para empezar a escribir.</figcaption></figure>
+<figure><a href="images/inicio.png?v=manual-20261118"><img src="images/inicio.png?v=manual-20261118" alt="Bienvenida con las opciones para generar un estilo, escribir para guitarra y crear un ritmo"></a><figcaption>Las pestañas Genre, Band y Guitarist permiten escoger el origen del estilo. Choose everything… abre el panel completo antes de generar.</figcaption></figure>
 <div class="diagram" aria-label="Flujo de trabajo"><span>Crear o abrir</span><b aria-hidden="true">→</b><span>Componer</span><b aria-hidden="true">→</b><span>Editar y mezclar</span><b aria-hidden="true">→</b><span>Guardar y exportar</span></div>
 </section>
 
@@ -106,6 +107,7 @@
 <article><h3>Chords</h3><p>Selecciona raíz, tipo y disposición del acorde. Escúchalo y colócalo en el cursor o úsalo como referencia para la progresión. <kbd>Shift+1</kbd> a <kbd>Shift+7</kbd> recorre los grados de la tonalidad.</p></article>
 <article><h3>Duración y cursor</h3><p>Escoge duración antes de escribir. Si ya hay notas seleccionadas, puedes cambiar sus valores desde la paleta de partitura. La misma nota se refleja en los demás editores.</p></article>
 </div>
+<p>Al seleccionar una pista, el panel Input cambia al diapasón para guitarra o bajo, y al teclado para otros instrumentos melódicos. Puedes cambiar manualmente de pestaña.</p>
 <figure><a href="images/acordes.png"><img src="images/acordes.png" alt="Panel Chords con los controles del constructor de acordes" loading="lazy"></a><figcaption>El panel <strong>Chords</strong> muestra el acorde que puedes escuchar o insertar.</figcaption></figure>
 </section>
 
@@ -114,8 +116,9 @@
 <figure><a href="images/patron.png"><img src="images/patron.png" alt="Rack de patrones con pasos, canales y pads de batería" loading="lazy"></a><figcaption>Usa las flechas de compás y abre el canal de batería para editar los pads individualmente.</figcaption></figure>
 <p>En batería, pulsa una celda para activar o quitar un golpe. <kbd>Shift</kbd> aplica el acento. El nombre de un pad permite escucharlo y el menú contextual permite cambiar su sonido. En canales melódicos elige <strong>Step note</strong> (raíz del acorde, acorde completo, raíz de la tonalidad u octava) y duración. <strong>Clear bar</strong> vacía la parte del canal y el menú del patrón permite renombrar, clonar, cambiar longitud, colocar o borrar.</p>
 <h3>Piano Roll · F3</h3>
-<figure><a href="images/piano-roll.png"><img src="images/piano-roll.png" alt="Piano Roll de ScoreDAW con el teclado lateral y la cuadrícula de notas" loading="lazy"></a><figcaption>La posición horizontal es el tiempo. La fila corresponde a la altura. La franja inferior controla la velocidad.</figcaption></figure>
+<figure><a href="images/piano-roll.png?v=manual-20261118"><img src="images/piano-roll.png?v=manual-20261118" alt="Piano Roll de ScoreDAW con el teclado lateral y la cuadrícula de notas" loading="lazy"></a><figcaption>La posición horizontal es el tiempo. La fila corresponde a la altura. La franja inferior controla la velocidad.</figcaption></figure>
 <p>Pulsa un espacio para añadir una nota. Arrastra una nota para moverla y su borde derecho para ajustar duración. <kbd>Shift</kbd> añade notas a la selección. Clic derecho borra. Usa los controles para cuantizar a semicorchea, transponer por semitonos u octava y cambiar la velocidad de las notas en la franja inferior.</p>
+<p>En modo <strong>SONG</strong>, durante la reproducción, el Piano Roll muestra el bloque que está sonando en la pista seleccionada. La línea avanza y las notas activas se iluminan. Los patrones cortos se expanden al ancho disponible del panel. En modo <strong>PAT</strong>, revisa el patrón seleccionado.</p>
 <h3>Score, Tab y Score + Tab · F4, F5 y F6</h3>
 <figure><a href="images/partitura.png"><img src="images/partitura.png" alt="Partitura y tablatura ligadas con el título centrado y la paleta de notación" loading="lazy"></a><figcaption>La paleta está a la izquierda. El botón <strong>Edit title</strong> está junto a <strong>Palette</strong>.</figcaption></figure>
 <ol>
@@ -125,15 +128,16 @@
 <li>Añade dinámica, reguladores y articulaciones. En guitarra y bajo puedes aplicar palm mute, let ring, nota fantasma o muerta, hammer-on, pull-off, tapping, vibrato, armónicos, slides y bends. Selecciona dos notas para revisar un slide de unión.</li>
 <li>En <strong>Bars</strong>, sobre el compás del cursor, configura repetición, casillas, doble barra, segno, coda, Fine, D.C., D.S. o texto. Comprueba el orden escuchando la canción.</li>
 </ol>
+<p>La marca <strong>T.H.</strong> identifica un armónico tapeado en las frases generadas que lo usan. <strong>A.H.</strong> identifica el armónico artificial o pinch. El slide se rotula sobre la tablatura.</p>
 <p>El ancho de cada compás se ajusta a sus notas y símbolos. Las figuras rápidas pueden agruparse por pulso. Un compás especialmente denso puede requerir desplazamiento horizontal. Renombra la canción con <strong>Edit title</strong> o <strong>File → Song title</strong>.</p>
 </section>
 <section id="generacion"><h2>8. Genera una canción o una pista</h2>
 <div class="cards"><article><h3>Auto Generate Full Song</h3><p>Crea el arreglo completo con secciones y pistas. <kbd>Ctrl+Shift+G</kbd>.</p></article>
 <article><h3>Auto Generate Track</h3><p>Escribe una parte que encaje en la canción abierta. <kbd>Ctrl+G</kbd>.</p></article></div>
 <h3>Canción completa</h3>
-<figure><a href="images/cancion.png"><img src="images/cancion.png" alt="Diálogo Auto Generate Full Song con columnas de género, armonía y banda" loading="lazy"></a><figcaption>Elige estilo y forma a la izquierda, ajusta progresiones y melodía en el centro y configura los instrumentos a la derecha.</figcaption></figure>
+<figure><a href="images/cancion.png?v=manual-20261118"><img src="images/cancion.png?v=manual-20261118" alt="Diálogo Auto Generate Full Song con columnas de género, armonía y banda" loading="lazy"></a><figcaption>Elige estilo y forma a la izquierda, ajusta progresiones y melodía en el centro y configura los instrumentos a la derecha.</figcaption></figure>
 <ol>
-<li>Selecciona <strong>Genre</strong> o un perfil en <strong>Bands</strong>. Los estilos con <strong>Kind of song</strong> tienen variantes. En <strong>Rock</strong> puedes elegir <strong>Acoustic Guitar</strong>. <strong>Extreme</strong> ofrece <strong>Funk metal</strong> y <strong>Acoustic ballad</strong> con Nuno Bettencourt.</li>
+<li>En <strong>Style</strong>, selecciona la pestaña <strong>Genre</strong>, <strong>Band</strong> o <strong>Guitarist</strong> y elige en el desplegable. Los estilos con <strong>Kind of song</strong> tienen variantes. En <strong>Rock</strong> puedes elegir <strong>Acoustic Guitar</strong>. <strong>Extreme</strong> ofrece <strong>Funk metal</strong> y <strong>Acoustic ballad</strong> con Nuno Bettencourt.</li>
 <li>Escoge tonalidad, modo, tempo, forma <strong>Short / Standard / Extended</strong> y <strong>Ending</strong>. La resolución se prolonga mediante ligadura. Los finales de Jazz permiten cadencias con acordes como 6/9, maj9 o maj13.</li>
 <li>Deja una progresión en <strong>Auto</strong> o cámbiala por sección. Los números romanos se transponen a la tonalidad elegida. Cuando aparezca <strong>Reference artist</strong>, puedes elegir sus patrones y hábitos musicales.</li>
 <li>Ajusta <strong>Complexity</strong>, <strong>Density</strong> e <strong>Idea</strong>. La misma semilla y opciones permiten repetir el arreglo. El dado cambia la idea. Activa según el estilo líneas complejas, carreras rápidas, tresillos, mezcla de modos, slides, armónicos, bends y vibrato.</li>
@@ -141,6 +145,10 @@
 <li>Cuando esté disponible, selecciona modo instrumental o cantante, voz y coros. En <strong>Guitars</strong> elige Guitar Rig o el modelo ligero. Pulsa <strong>Generate Full Song</strong>.</li>
 </ol>
 <div class="tip"><p>Generar la canción completa reemplaza el arreglo activo. Guarda tu proyecto si quieres conservarlo. Puedes volver con <kbd>Ctrl+Z</kbd>.</p></div>
+<h3>Personaliza el estilo antes de generar</h3>
+<p>Al seleccionar otro género, grupo o guitarrista, el panel carga su preset. Revisa tempo, instrumentos, voz y las técnicas, y después modifica los valores que necesites. Despliega <strong>Melody — what the lead may use</strong> para acceder a las técnicas y al plan de interpretación del lead. <strong>Lead guitar in the style of</strong> elige el vocabulario guitarrístico dentro del arreglo.</p>
+<p>Para una pieza instrumental de Yngwie, Satriani o Vai, entra por <strong>Guitarist</strong> y comprueba que <strong>Song</strong> esté en <strong>Instrumental</strong>. Para Van Halen, usa <strong>Band → Van Halen</strong>, revisa <strong>Kind of song</strong> y la parte del lead por sección. Las técnicas activadas se distribuyen según la frase y el estilo.</p>
+<p>Guarda el proyecto para conservar su receta. <strong>This song #…</strong> recupera las opciones de la canción abierta y <strong>Last #…</strong> reutiliza la semilla anterior. Revisa la selección de pista después de generar. El programa intenta mostrar el instrumento protagonista con un editor apropiado.</p>
 <h3>Pista compatible con la canción actual</h3>
 <figure><a href="images/pista.png"><img src="images/pista.png" alt="Diálogo Auto Generate Track con análisis a la izquierda y parámetros de la pista a la derecha" loading="lazy"></a><figcaption>Comprueba el análisis de armonía y secciones antes de aplicar la generación.</figcaption></figure>
 <ol>
@@ -150,6 +158,41 @@
 <li>Genera, escucha y edita el resultado en Pattern, Piano Roll o Score + Tab. Deshaz para probar otra semilla.</li>
 </ol>
 </section>
+
+<section id="clasica"><h2>8.1. Compón música clásica y conjuntos de cuerdas</h2>
+<p>Abre <strong>Auto Generate Full Song → Genre → Classical</strong>. El arreglo puede combinar piano, guitarra de nylon, violines y viola. Puedes desactivar pistas para crear un dúo, una pieza solista o un conjunto formado por violines.</p><figure><a href="images/clasica.png?v=manual-20261118"><img src="images/clasica.png?v=manual-20261118" alt="Panel clásico con tres partes de violín, diálogo instrumental e introducción gradual" loading="lazy"></a><figcaption>Ejemplo con Vivaldi, tres partes de violín, guitarra como instrumento de apertura y Violin II como solista de la cadenza.</figcaption></figure><h3>Primera pieza guiada</h3><ol>
+<li>Elige <strong>Classical style → Vivaldi · String concerto</strong>. Establece tonalidad y modo, tempo y <strong>Form → Standard</strong>.</li>
+<li>Activa piano, guitarra, violín y viola en la columna de instrumentos. En <strong>Lead instrument</strong>, selecciona <strong>Solo violin</strong>.</li>
+<li>Elige <strong>Interaction → Call and response</strong> y <strong>Answering instrument → Classical guitar</strong>. El protagonista y el instrumento de respuesta se alternan en las frases.</li>
+<li>Usa <strong>Violin and viola → Legato arco</strong> para priorizar el arco continuo. Elige <strong>Solo technique → Trills and fast runs</strong> y una complejidad superior a la mitad para permitir adornos en episodios solistas.</li>
+<li>Selecciona <strong>Introduction → Gradual entrances</strong> y <strong>Opening instrument → Classical guitar</strong>. Elige el solista en <strong>Cadenza soloist</strong>.</li>
+<li>Pulsa <strong>Generate Full Song</strong>, espera la carga de grabaciones y escucha. Ajusta el balance con los faders y guarda con <strong>Save as</strong>.</li>
+</ol><h3>Estilos y estructura</h3>
+<div class="table"><table><thead><tr><th>Control</th><th>Uso</th></tr></thead><tbody><tr><td><strong>Bach · Baroque invention</strong></td><td>Tema, respuesta y contrapunto imitativo con desarrollo del motivo.</td></tr>
+<tr><td><strong>Vivaldi · String concerto</strong></td><td>Alternancia de ritornellos y episodios con protagonismo de las cuerdas.</td></tr>
+<tr><td><strong>Mozart · Classical chamber music</strong></td><td>Frases de pregunta y respuesta y acompañamientos de tipo bajo de Alberti.</td></tr>
+<tr><td><strong>Beethoven · Dramatic sonata</strong></td><td>Exposición, desarrollo y recapitulación con motivos rítmicos contrastantes.</td></tr>
+<tr><td><strong>Chopin · Romantic nocturne</strong></td><td>Melodía cantabile sobre arpegios y una sección central más activa.</td></tr></tbody></table></div><p>Estos perfiles generan composiciones nuevas. Los controles permiten variar la instrumentación, tonalidad, densidad y estructura de cada propuesta.</p><h3>Referencia del arreglo clásico</h3>
+<div class="table"><table><thead><tr><th>Control</th><th>Uso</th></tr></thead><tbody><tr><td><strong>Lead instrument</strong></td><td>Instrumento que lleva el tema principal. Activa su pista para que aparezca en las opciones.</td></tr>
+<tr><td><strong>Interaction</strong></td><td><strong>Fixed lead</strong> mantiene el protagonista. <strong>Call and response</strong> alterna frases con la respuesta. <strong>Lead rotates by section</strong> cambia el protagonista por sección. <strong>Imitative counterpoint</strong> introduce una imitación del motivo.</td></tr>
+<tr><td><strong>Answering instrument</strong></td><td>Escoge quién contesta en diálogo o contrapunto imitativo.</td></tr>
+<tr><td><strong>Meter</strong></td><td>Selecciona 4/4, 3/4, 2/4 o 6/8 antes de generar.</td></tr>
+<tr><td><strong>Violin and viola</strong></td><td><strong>Legato with occasional pizzicato</strong> combina arco ligado con pizzicato ocasional. <strong>Legato arco</strong> mantiene el arco. <strong>Spiccato / short bow</strong> favorece ataques cortos y <strong>Pizzicato</strong> usa la cuerda pulsada.</td></tr>
+<tr><td><strong>Solo technique</strong></td><td><strong>Trills and fast runs</strong> permite trinos y carreras. <strong>Fast runs</strong> favorece las carreras. <strong>Lyrical phrasing</strong> conserva un fraseo más cantabile. La complejidad y la sección condicionan la aparición de adornos.</td></tr>
+<tr><td><strong>Instrument roles</strong></td><td><strong>Follow style</strong> usa el preset. Piano y guitarra pueden hacer arpegios, acordes, contramelodía o una mezcla de melodía, arpegios y acordes. Las cuerdas pueden sostener el fondo, realizar contramelodía o acordes quebrados. <strong>Tacit unless featured</strong> reserva la pista para su protagonismo.</td></tr>
+<tr><td><strong>Violin parts</strong></td><td>Activa de una a cuatro partes. <strong>None</strong> desactiva los violines. El número representa pistas musicales. Cada pista puede usar una grabación solista o una sección.</td></tr>
+<tr><td><strong>Violins only</strong></td><td>Activa las cuatro partes de violín y desactiva piano, guitarra y viola. Después puedes reducir el número de partes o reactivar otros instrumentos.</td></tr>
+<tr><td><strong>Introduction / Opening instrument</strong></td><td>Elige una introducción variable, con conjunto completo, un instrumento o entradas graduales. Opening instrument decide quién abre cuando corresponde.</td></tr>
+<tr><td><strong>Cadenza soloist</strong></td><td>Asigna el episodio solista a un instrumento activo, incluida la guitarra, o deja que varíe con la idea.</td></tr>
+<tr><td><strong>Lead by section</strong></td><td>Asigna el protagonista de cada sección o usa <strong>Follow interaction</strong>. Las asignaciones concretas de sección prevalecen sobre la rotación automática.</td></tr>
+<tr><td><strong>Chamber instruments and effects</strong></td><td>Activa cada pista y ajusta su instrumento y efectos. <strong>Solo Violin</strong>, <strong>Violin Section</strong>, <strong>Solo Viola</strong> y <strong>Viola Section</strong> utilizan grabaciones acústicas.</td></tr></tbody></table></div><h3>Tres arreglos para probar</h3>
+<div class="cards">
+<article><h3>Piano con fondo de cuerdas</h3><p>Selecciona Piano como protagonista, un papel de mezcla para Piano y Sustained background para las cuerdas. Usa Fixed lead para escuchar melodía y acompañamiento de piano a la vez.</p></article>
+<article><h3>Conjunto de violines</h3><p>Pulsa Violins only. Elige dos o cuatro Violin parts, Imitative counterpoint y Violin II como respuesta. Con Gradual entrances escucharás cómo entra cada parte.</p></article>
+<article><h3>Episodio de guitarra</h3><p>Activa Classical Guitar y elígela en Cadenza soloist. Usa una forma Standard con episodio o cadenza y Fast runs. También puedes asignar Guitar directamente en Lead by section.</p></article>
+</div><h3>Ligaduras, trinos y balance</h3>
+<p>La ligadura de prolongación une notas consecutivas de la misma altura y mantiene su duración al cruzar el compás. La ligadura de arco agrupa notas de una frase. Un trino alterna rápidamente una nota con la nota vecina de la escala. Escucha la pista con <strong>S</strong> para comprobar el fraseo y usa el plan por sección para ubicar los solos.</p><figure><a href="images/cuerdas.png?v=manual-20261118"><img src="images/cuerdas.png?v=manual-20261118" alt="Partitura de violín generada en ScoreDAW" loading="lazy"></a><figcaption>La partitura permite revisar la frase, sus ligaduras y las notas rápidas. El cursor sigue la reproducción.</figcaption></figure><div class="tip"><p>Para escuchar una viola que sostiene una nota larga, deja la reproducción avanzar sobre la barra siguiente. También puedes iniciar desde un compás de continuación. Si buscas menos separación, selecciona <strong>Legato arco</strong> y vuelve a generar. Con <strong>Solo Viola</strong> o <strong>Viola Section</strong>, ajusta el fader del Inspector para equilibrar su fondo con el instrumento protagonista.</p></div>
+<p>Los cambios del generador se aplican al crear una pieza nueva. Conserva una copia de la canción anterior antes de comparar arreglos.</p></section>
 
 <section id="sonido"><h2>9. Configura instrumentos, mezcla y efectos</h2>
 <h3>Inspector</h3>
@@ -242,6 +285,7 @@
 <tr><td>Amplificadores y respuestas de impulso</td><td><strong>TONE3000</strong>, motor Neural Amp Modeler WebAssembly, capturas y respuestas (MIT según los avisos del proyecto). Núcleo <strong>Neural Amp Modeler</strong> de <strong>Steven Atkinson</strong>.</td></tr>
 <tr><td>Grabaciones de piano</td><td><strong>Alexander Holm</strong>, Salamander Grand Piano V3 (CC BY 3.0). <strong>Jeff Learman</strong>, jRhodes3d (CC BY-NC-SA 4.0). <strong>Greg Sullivan</strong>, Wurlitzer EP200 con mapeo SFZ de <strong>kinwie</strong> (CC BY 3.0).</td></tr>
 <tr><td>Grabaciones de viento</td><td><strong>Versilian Studios, Samuel Gossner y colaboradores</strong>, saxo tenor VCSL y trompeta de VSCO-2 Community Edition interpretada por <strong>Simon Hutchinson</strong> (CC0 1.0).</td></tr>
+<tr><td>Grabaciones de cuerdas</td><td><strong>VSCO 2 Community Edition</strong>, Versilian Studios, Sam Gossner y Simon Dalzell, con edición de muestras de Elan Hickler / Soundemote (CC0 1.0), para violín solista y secciones de violines y violas. <strong>University of Iowa Electronic Music Studios</strong>, Lawrence Fritts y equipo, para viola solista. Su colección permite usar las grabaciones sin restricciones. Avisos y procedencia en <a href="../assets/bowed-strings/CREDITS.txt">CREDITS de cuerdas</a>.</td></tr>
 <tr><td>Exportación MP3</td><td><strong>lamejs</strong>, adaptación de LAME, con licencia LGPL-3.0 según los avisos del proyecto.</td></tr>
 <tr><td>Edición Windows</td><td><strong>Steinberg</strong>, VST 3 SDK (MIT). <strong>Comunidad free-audio</strong>, CLAP (MIT). <strong>Microsoft</strong>, WebView2 SDK (licencia del SDK).</td></tr>
 <tr><td>Paquetes opcionales</td><td>Integraciones con las bibliotecas de <strong>LiveReplica</strong> y <strong>Lemon-Studio</strong>. Los recursos de audio importados o convertidos desde bibliotecas externas mantienen las condiciones de sus autores.</td></tr>
