@@ -146,7 +146,7 @@
     const table = [[/electric piano|\bep\b/, 4], [/clavinet/, 7], [/vibraphone/, 11], [/organ/, 16], [/accordion/, 21], [/harmonica|melodica/, 22], [/piano/, 0],
       [/nylon|classical|requinto|bossa/, 24], [/steel|acoustic|12-string/, 25], [/lead guitar|electric guitar - lead|overdrive/, 29], [/guitar|telecaster|skank|segunda/, 27],
       [/upright bass|baby bass/, 32], [/808|synth bass/, 38], [/pick|slap/, 34], [/bass/, 33],
-      [/fiddle|violin/, 40], [/viola/, 41], [/string/, 48], [/pad/, 89], [/trumpet/, 56], [/trombone/, 57], [/alto sax/, 65], [/tenor sax|sax/, 66], [/flute/, 73],
+      [/harp/, 46], [/fiddle|violin/, 40], [/viola/, 41], [/string/, 48], [/pad/, 89], [/trumpet/, 56], [/trombone/, 57], [/alto sax/, 65], [/tenor sax|sax/, 66], [/flute/, 73],
       [/saw lead|hook/, 81], [/square lead/, 80], [/pluck/, 84]];
     for (const [re, p] of table) if (re.test(n)) return p;
     return { guitar: 25, bass: 33, keys: 0, strings: 48, synth: 81 }[t.type] || 0;

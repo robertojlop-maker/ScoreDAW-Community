@@ -309,7 +309,7 @@
       const all = SG.progsFor(style, g, mode), ok = all.filter(p => fits(p, g));
       const list = ok.length ? ok : all;
       // the first progression of a style is its signature (12-bar blues, montuno…): chosen half of the time
-      if (list.length) out[g] = (R.chance(0.5) ? list[0] : R.pick(list)).c;
+      if (list.length) out[g] = (style.profile?.romantic ? R.pick(list) : R.chance(0.5) ? list[0] : R.pick(list)).c;
     });
     if (!out.verse) out.verse = GENERIC[mode].verse;
     if (!out.chorus) out.chorus = SG.progsFor(style, 'verse', mode).length ? out.verse : GENERIC[mode].chorus;
@@ -325,8 +325,10 @@
       const list = only.length && R.chance(0.6) ? only : intros;
       out.intro = list.length ? R.pick(list).c : out.chorus;
     }
-    const outro = SG.progsFor(style, 'outro', mode)[0];
-    if (outro) out.outro = outro.c;
+    const endings = SG.progsFor(style, 'outro', mode);
+    const outro = style.profile?.romantic && endings.length ? R.pick(endings) : endings[0];
+    if (style.profile?.romantic && chosen?.outro && chosen.outro !== 'auto') out.outro = chosen.outro;
+    else if (outro) out.outro = outro.c;
     else { const toks = out.chorus.split(' '); toks[toks.length - 1] = mode === 'minor' ? 'i' : 'I'; out.outro = toks.join(' '); }
     return out;
   };
@@ -839,9 +841,10 @@
     const tracks = {};
     st.tracks.forEach(t => { tracks[t.id] = { on: t.on !== false, inst: t.inst, play: t.play || null, fx: t.fx || 'Room' }; });
     const lead = st.tracks.find(t => t.lead) || {};
-    return { genre, songType: st.type || 'auto', key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 1, density: 1, seed, progs: {}, tracks,
+    const options = { genre, songType: st.type || 'auto', key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 1, density: 1, seed, progs: {}, tracks,
       vocals: 'instrumental', voice: 'auto', choir: 'auto', leadPlan: {},
       melody: Object.assign({ complex: false, fast: false, triplets: false, modes: false, slides: false, harmonics: false, bends: false, vibrato: true, hero: 'auto' }, lead.mel || {}) };
+    return st.profile?.romantic ? SDAW.romantic.prepare(options, st, true) : options;
   };
 
 
@@ -1225,6 +1228,7 @@
       opts = Object.assign({}, opts, { songType: d.songType, tracks: d.tracks, tempo: d.tempo, key: d.key, mode: d.mode, leadPlan: SG.planActive(opts.leadPlan) ? opts.leadPlan : d.leadPlan, autoType: true });
     }
     let st = SG.styleOf(opts);
+    if (st.profile?.romantic) opts = SDAW.romantic.prepare(SDAW.deepCopy(opts), st);
     // extra instruments of the panel join the band of the genre (only for this song)
     const extras = (st.classical ? [] : opts.extras || []).map((x, i) => SG.extraSpec(x, st, i)).filter(Boolean);
     const trackOpts = Object.assign({}, opts.tracks);
@@ -1372,6 +1376,7 @@
       const base = SDAW.STYLES[o.genre];
       if (base.band) o.ref = '';
       const st = SG.styleOf(o);
+      if (st.profile?.romantic) SDAW.romantic.prepare(o, st);
       body.innerHTML = '';
       /* ---- column 1: genre, key, form ---- */
       const c1 = el('div', { class: 'sg-col' });
@@ -1400,7 +1405,10 @@
         c1.appendChild(el('select', { class: 'sg-ref', onchange: e => {
           const v = e.target.value;
           const next = SG.genrePreset(o.genre, o.seed, v === 'auto' ? SG.typeOf(base, { seed: o.seed }) : v);
-          if (st.classical) Object.assign(next, { tracks: o.tracks, structure: o.structure });
+          if (st.classical) {
+            next.structure = o.structure;
+            if (!st.profile?.romantic && !SG.styleOf(next).profile?.romantic) next.tracks = o.tracks;
+          }
           o = next;
           render(); } },
           (st.classical ? [] : [el('option', { value: 'auto', selected: cur === 'auto' ? true : null }, 'Pick a kind for this idea')]).concat(Object.keys(base.types).map(id => el('option', { value: id, selected: cur === id ? true : null }, base.types[id].n)))));
@@ -1459,10 +1467,10 @@
       }
       c1.appendChild(row('Complexity', slider('complexity', v => v < 0.3 ? 'Simple' : v < 0.7 ? 'Normal' : 'Advanced')));
       c1.appendChild(row('Density', slider('density', v => v < 0.3 ? 'Sparse' : v < 0.7 ? 'Medium' : 'Busy')));
-      const seedIn = el('input', { type: 'number', min: 1, value: o.seed, style: { width: '80px' }, onchange: e => { o.seed = +e.target.value || 1; } });
+      const seedIn = el('input', { type: 'number', min: 1, value: o.seed, style: { width: '80px' }, onchange: e => { o.seed = +e.target.value || 1; if (st.profile?.romantic) render(); } });
       c1.appendChild(row('Idea', el('div', { class: 'sg-inline', 'data-help': 'Every new song is a new idea. The idea number is saved in the song: the same options with the same idea rebuild the same song.' }, [seedIn,
-        el('button', { class: 'btn small', 'data-help': 'A new composition with the same options', onclick: () => { o.seed = SG.newSeed(); seedIn.value = o.seed; if (base.types && !(o.songType && base.types[o.songType])) { o = SG.startDefaults(Object.assign(SG.variedDefaults(o.genre, o.seed), { songType: 'auto', complexity: o.complexity, density: o.density, structure: o.structure, extras: o.extras, ending: o.ending })); render(); } } }, '🎲 New idea'),
-        SG.last && SG.last.seed ? el('button', { class: 'btn small', 'data-help': 'Use again the idea (seed) of the last generated song: same options + same idea = the same song', onclick: () => { o.seed = SG.last.seed; seedIn.value = o.seed; } }, '↺ Last #' + SG.last.seed) : null,
+        el('button', { class: 'btn small', 'data-help': 'A new composition with the same options', onclick: () => { o.seed = SG.newSeed(); seedIn.value = o.seed; if (st.profile?.romantic) { render(); return; } if (base.types && !(o.songType && base.types[o.songType])) { o = SG.startDefaults(Object.assign(SG.variedDefaults(o.genre, o.seed), { songType: 'auto', complexity: o.complexity, density: o.density, structure: o.structure, extras: o.extras, ending: o.ending })); render(); } } }, '🎲 New idea'),
+        SG.last && SG.last.seed ? el('button', { class: 'btn small', 'data-help': 'Use again the idea (seed) of the last generated song: same options + same idea = the same song', onclick: () => { o.seed = SG.last.seed; seedIn.value = o.seed; if (st.profile?.romantic) render(); } }, '↺ Last #' + SG.last.seed) : null,
         songGen ? el('button', { class: 'btn small', 'data-help': 'Load every option and the idea saved in the current song (to rebuild it or make a variation)', onclick: () => { o = Object.assign(SG.defaults(songGen.opts.genre, songGen.seed), SDAW.deepCopy(songGen.opts)); render(); } }, '📄 This song #' + songGen.seed) : null])));
 
       /* ---- column 2: progressions ---- */
@@ -1471,7 +1479,7 @@
       if (chamberSections) SDAW.classical.controls(c2, chamberSections, o, st, secs, row, render);
       c2.appendChild(el('div', { class: 'ag-sub', 'data-help': 'Intro and Outro take their own progressions (turnarounds, endings) or reuse the chorus and end on the tonic.' + (o.genre === 'Blues' ? ' Blues uses few progressions: the 12-bar form is the genre.' : '') },
         'Progressions (' + st.progs.length + ' in the ' + o.genre + ' library)'));
-      const groups = [...new Set(secs.map(x => SG.groupOf(x.type)))].filter(g => g !== 'intro' && g !== 'outro');
+      const groups = [...new Set(secs.map(x => SG.groupOf(x.type)))].filter(g => st.profile?.romantic || (g !== 'intro' && g !== 'outro'));
       const flats = SG.prefersFlats(o.key, o.mode);
       groups.forEach(g => {
         const list = SG.progsFor(st, g, o.mode);
@@ -1480,7 +1488,7 @@
         const cur = o.progs[g] && o.progs[g] !== 'auto' ? o.progs[g] : null;
         // one line per section; the chords appear only when a progression is chosen
         c2.appendChild(el('div', { class: 'sg-prog' + (cur ? ' chosen' : '') }, [
-          el('b', {}, (st.classical ? { verse: 'Exposition', chorus: 'Return', pre: 'Answer', bridge: 'Development', solo: 'Episode / Cadenza' } : { verse: 'Verse', chorus: 'Chorus', pre: 'Pre-Chorus', bridge: 'Bridge', solo: 'Solo / Mambo / Jaleo' })[g] || g), sel,
+          el('b', {}, (st.classical ? { intro: 'Introduction', verse: 'Exposition', chorus: 'Return', pre: 'Answer', bridge: 'Development', solo: 'Episode / Cadenza', outro: 'Coda' } : { verse: 'Verse', chorus: 'Chorus', pre: 'Pre-Chorus', bridge: 'Bridge', solo: 'Solo / Mambo / Jaleo' })[g] || g), sel,
           cur ? el('div', { class: 'sg-chords' }, cur.split(' ').map(t => el('span', {}, t + ' → ' + t.split('-').map(h => SG.romanToName(h, o.key, flats)).join('·')))) : null]));
       });
       if (!st.classical) {
@@ -1532,9 +1540,13 @@
         const tr = o.tracks[sp.id];
         const alt = sp.role === 'drums' ? [sp.inst] : (sp.alternatives || SDAW.STYLE_ALT[sp.alt] || (sp.role === 'bass' ? SDAW.STYLE_ALT.bass : [sp.inst]));
         const insts = [...new Set([sp.inst].concat(alt))];
-        const ico = st.classical ? ({ piano: '🎹', guitar: '🎸' })[sp.id] || '🎻' : sp.role === 'drums' ? '🥁' : sp.role === 'bass' ? '🎸' : ['melody', 'horns', 'horn2', 'counter'].includes(sp.role) ? '🎺' : '🎹';
+        const ico = st.classical ? ({ piano: '🎹', guitar: '🎸', harp: '🪉' })[sp.id] || '🎻' : sp.role === 'drums' ? '🥁' : sp.role === 'bass' ? '🎸' : ['melody', 'horns', 'horn2', 'counter'].includes(sp.role) ? '🎺' : '🎹';
         tbl.appendChild(el('div', { class: 'sg-track' + (tr.on ? '' : ' off') }, [
-          el('label', { class: 'sg-tname' }, [el('input', { type: 'checkbox', checked: tr.on ? true : null, onchange: e => { tr.on = e.target.checked; render(); } }), el('span', {}, ico + ' ' + sp.name)]),
+          el('label', { class: 'sg-tname' }, [el('input', { type: 'checkbox', checked: tr.on ? true : null, onchange: e => {
+            tr.on = e.target.checked;
+            if (st.profile?.romantic) o.chamber.ensemble = 'manual';
+            render();
+          } }), el('span', {}, ico + ' ' + sp.name)]),
           el('select', { title: 'Instrument', disabled: sp.role === 'drums' ? true : null, onchange: e => { tr.inst = e.target.value; } }, insts.map(n => el('option', { value: n, selected: tr.inst === n ? true : null }, n))),
           sp.plays ? el('select', { title: 'How it plays', onchange: e => { tr.play = e.target.value; } }, sp.plays.map(pl => el('option', { value: pl, selected: tr.play === pl ? true : null }, PLAY_LABEL[pl] || pl)))
             : el('span', { class: 'sg-role' }, st.classical ? '' : ROLE_LABEL[sp.role] || sp.role),

@@ -271,6 +271,9 @@ window.CONFIG = {
         { name: 'Solo Viola', engine: 'bowed', type: 'strings', source: 'University of Iowa MIS', params: { bowed: 'solo-viola' } },
         { name: 'Viola Section', engine: 'bowed', type: 'strings', source: 'VSCO 2 CE recordings', params: { bowed: 'viola' } }
       ]},
+      { group: 'Concert Harp (recorded)', icon: '🪉', items: [
+        { name: 'Concert Harp', engine: 'harp', type: 'keys', source: 'VSCO 2 CE acoustic harp', params: {} }
+      ]},
       { group: 'Strings & Pads', icon: '🎻', items: [
         { name: 'String Ensemble', engine: 'strings', type: 'strings', source: 'LiveReplica', params: {} },
         { name: 'Warm Pad', engine: 'strings', type: 'strings', source: 'ScoreDAW', params: { cutoff: 1400 } }

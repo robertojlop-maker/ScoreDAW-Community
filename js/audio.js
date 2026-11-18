@@ -423,6 +423,10 @@
     const params = track.params || {};
     let engine = track.engine;
     if (track.sampler && track.sampler.zones && track.sampler.zones.length && playSampler(track, pitch, time, dur, opts)) return;
+    if (engine === 'harp') {
+      if (SDAW.harp.play(c, track, pitch, time, dur, opts, ch.input, keep)) return;
+      engine = 'keys';
+    }
     if (engine === 'bowed') {
       if (SDAW.bowed.play(c, track, pitch, time, dur, opts, ch.input, keep)) return;
       engine = 'strings'; // Preserve playback if recordings fail to load.
@@ -569,10 +573,22 @@
   /* ========================================================= PREVIEW == */
   function previewWhenReady(track, action) {
     const context = A.ctx;
-    const ready = SDAW.bowed.whenReady(track, context);
+    const ready = track.engine === 'harp' ? SDAW.harp.whenReady(track, context) : SDAW.bowed.whenReady(track, context);
     if (!ready) { action(); return; }
     ready.catch(() => {}).then(() => { if (A.ctx === context && !A.offline) action(); });
   }
+  let harpPreview = 0;
+  A.previewHarp = function (track) {
+    A.init();
+    const context = A.ctx, token = ++harpPreview;
+    previewWhenReady(track, () => {
+      if (token !== harpPreview) return;
+      A.updateTrack(track);
+      const start = context.currentTime + .02;
+      [48, 55, 60, 64, 67, 72].forEach((pitch, i) =>
+        playMelodic(track, pitch, start + i * .18, .9, { vel: 72 + i * 2 }));
+    });
+  };
   let bowedPreview = 0;
   A.previewBowed = function (track) {
     A.init();
@@ -591,8 +607,11 @@
     A.init();
     if (!track) return;
     if (track.type === 'drums') return A.previewDrum(track, 'snare');
-    if (track.engine === 'bowed') {
-      previewWhenReady(track, () => playMelodic(track, pitch, A.ctx.currentTime + .01, opts?.dur || .6, { vel: 96, ...opts }));
+    if (track.engine === 'bowed' || track.engine === 'harp') {
+      previewWhenReady(track, () => {
+        A.updateTrack(track);
+        playMelodic(track, pitch, A.ctx.currentTime + .01, opts?.dur || .6, { vel: 96, ...opts });
+      });
       return;
     }
     A.updateTrack(track);
@@ -603,14 +622,18 @@
   A.previewChord = function (track, pitches, strum) {
     A.init(); if (!track) return;
     A.updateTrack(track);
-    pitches.forEach((p, i) => playMelodic(track, p, A.ctx.currentTime + 0.01, 1.2, { vel: 92, tech: strum ? { strum: 'down' } : {}, strumIndex: i }));
+    const play = () => pitches.forEach((p, i) => playMelodic(track, p, A.ctx.currentTime + 0.01, 1.2, { vel: 92, tech: strum ? { strum: 'down' } : {}, strumIndex: i }));
+    if (track.engine === 'harp') previewWhenReady(track, play);
+    else play();
   };
   A.previewDrum = function (track, row) { A.init(); A.updateTrack(track); playDrum(track, row, A.ctx.currentTime + 0.005, 0.9); };
 
   /** Preview a library instrument without a track (temporary track object) */
   A.previewInstrument = function (inst) {
     const tmp = SDAW.makeTrack(inst); tmp.id = '__preview';
+    harpPreview++;
     if (tmp.engine === 'bowed') { A.previewBowed(tmp); return; }
+    if (tmp.engine === 'harp') { A.previewHarp(tmp); return; }
     bowedPreview++;
     A.init(); A.updateTrack(tmp);
     // the previous preview's notes still waiting for their recordings are dropped
@@ -1014,7 +1037,8 @@
       if (SDAW.guitarRig) { if (opts.onProgress) opts.onProgress(0.005); await SDAW.guitarRig.prepareOffline(oc); }
       if (SDAW.pianoRig) await SDAW.pianoRig.prepareOffline(oc);
       if (SDAW.windRig) await SDAW.windRig.prepareOffline(oc);
-      await Promise.allSettled(SDAW.store.song.tracks.map(t => SDAW.bowed.whenReady(t, oc)));
+      await Promise.allSettled(SDAW.store.song.tracks.flatMap(t =>
+        [SDAW.bowed.whenReady(t, oc), SDAW.harp.whenReady(t, oc)]));
       const anySolo = SDAW.store.song.tracks.some(x => x.solo);
       applyAutomation(seqTick(A.seq.start), 0.1, anySolo, true);
       // plugin tracks (Windows version): rendered by the native engine, then mixed through their track chain
@@ -1070,7 +1094,8 @@
     // real instruments (Guitar / Piano / Wind Rig) still loading their recordings, amp captures or
     // IRs: wait for them, so the first notes already have the real sound (Stop cancels the wait)
     if (!(popts && popts.noWait)) {
-      const waits = SDAW.store.song.tracks.map(t => SDAW.bowed.whenReady(t, A.ctx)).filter(Boolean);
+      const waits = SDAW.store.song.tracks.flatMap(t =>
+        [SDAW.bowed.whenReady(t, A.ctx), SDAW.harp.whenReady(t, A.ctx)]).filter(Boolean);
       SDAW.store.song.tracks.forEach(t => [SDAW.guitarRig, SDAW.pianoRig, SDAW.windRig].forEach(R => {
         const w = R && R.whenReady ? R.whenReady(t) : null; if (w) waits.push(w);
       }));

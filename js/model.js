@@ -98,6 +98,7 @@
 
   SDAW.isPianoTrack = function (track) {
     if (!track || track.type !== 'keys') return false;
+    if (track.engine === 'harp') return true;
     const rig = track.engine === 'pianorig' && track.params && track.params.prig;
     if (rig) return rig === 'grand' || rig === 'epiano';
     return /\b(?:piano|rhodes|wurlitzer)\b/i.test(track.instrument || '');

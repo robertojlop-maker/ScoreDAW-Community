@@ -28,15 +28,17 @@
       name: 'Chopin · Romantic nocturne', tempo: [48, 96, 60], mode: 'minor', lead: 'piano', interaction: 'solo',
       notes: [0, 1, 2, 4, 3, 2, 1, 0], rhythm: [6, 2, 4, 2, 2], texture: 'arpeggio',
       major: ['I vi ii V7', 'I III7 vi V', 'IV iv V7 I'], minor: ['i bVI iv V7', 'i bIII bVI V7', 'iv iio V7 i']
-    }
+    },
+    romantic: SDAW.romantic.profile
   };
 
-  const labels = { piano: 'Piano', guitar: 'Classical guitar', violin: 'Solo violin', viola: 'Viola' };
+  const labels = { harp: 'Concert harp', piano: 'Piano', guitar: 'Classical guitar', violin: 'Solo violin', viola: 'Viola' };
   const violinIds = ['violin', 'violin2', 'violin3', 'violin4'];
   const isViolin = id => violinIds.includes(id);
   const isBowed = id => isViolin(id) || id === 'viola';
   const tracks = [
     { id: 'piano', name: 'Piano', role: 'harmony', inst: 'Grand Piano', range: [39, 90], vol: .71, pan: -.10 },
+    { id: 'harp', name: 'Concert Harp', role: 'arp', inst: 'Concert Harp', range: [36, 89], vol: .76, pan: .08, on: false },
     { id: 'guitar', name: 'Classical Guitar', role: 'arp', inst: 'Classical Guitar - Nylon', range: [40, 79], vol: .67, pan: .18 },
     { id: 'violin', name: 'Solo Violin', role: 'melody', inst: 'Solo Violin', range: [55, 88], vol: .81, pan: -.23 },
     ...violinIds.slice(1).map((id, i) => ({
@@ -46,7 +48,7 @@
     { id: 'viola', name: 'Viola', role: 'counter', inst: 'Solo Viola', alternatives: ['Viola Section'], range: [48, 76], vol: .40, pan: .25 }
   ];
 
-  const progressions = p => ['major', 'minor'].flatMap(mode => {
+  const progressions = p => p.romantic ? SDAW.romantic.progressions() : ['major', 'minor'].flatMap(mode => {
     const [theme, answer, development] = p[mode];
     return [
       { n: 'Theme and authentic cadence', m: mode, c: theme, use: 'verse chorus' },
@@ -62,6 +64,11 @@
     Standard: 'Intro:4 Exposition (Verse):8 Reply (Pre-Chorus):4 Development (Bridge):8 Cadenza (Solo):4 Reprise (Chorus):8 Coda (Outro):4',
     Extended: 'Intro:8 Exposition (Verse):8 Reply (Pre-Chorus):8 Development (Bridge):12 Cadenza (Solo):8 Reprise (Chorus):8 Coda (Outro):4'
   };
+  const romanticForms = {
+    Short: 'Intro:4 Main theme (Verse):8 Refrain (Chorus):8 Coda (Outro):4',
+    Standard: 'Intro:4 Main theme (Verse):8 Refrain (Chorus):8 Interlude (Bridge):4 Main theme return (Verse):8 Final refrain (Chorus):8 Coda (Outro):4',
+    Extended: 'Intro:4 Main theme (Verse):8 Refrain (Chorus):8 Interlude (Bridge):8 Main theme return (Verse):8 Refrain return (Chorus):8 Intimate reprise (Solo):4 Final refrain (Chorus):8 Coda (Outro):4'
+  };
   const standardForms = {
     bach: 'Intro:4 Subject (Verse):8 Answer (Pre-Chorus):4 Inversion (Bridge):8 Subject return (Chorus):8 Coda (Outro):4',
     vivaldi: 'Ritornello (Intro):4 First episode (Solo):8 Tutti return (Chorus):4 Second episode (Bridge):8 Ritornello return (Chorus):8 Coda (Outro):4',
@@ -69,9 +76,9 @@
     chopin: 'Intro:4 Cantabile (Verse):8 Agitato (Bridge):8 Ornamented return (Chorus):8 Coda (Outro):4'
   };
   SDAW.STYLES.Classical = {
-    family: 'Classical', classical: true, desc: 'Instrumental chamber music with piano, nylon guitar, violin and viola.',
+    family: 'Classical', classical: true, desc: 'Instrumental chamber music with piano, nylon guitar, concert harp, violin and viola.',
     tracks, types: Object.fromEntries(Object.entries(profiles).map(([id, p]) => [id, {
-      n: p.name, set: { mode: p.mode, tempo: p.tempo, profile: p, structures: { ...structures, Standard: standardForms[id] || structures.Standard } }
+      n: p.name, set: { mode: p.mode, tempo: p.tempo, profile: p, structures: p.romantic ? romanticForms : { ...structures, Standard: standardForms[id] || structures.Standard } }
     }])),
     key: { major: 'C', minor: 'A' }, tempo: profiles.bach.tempo, structures,
     progs: Object.entries(profiles).flatMap(([id, p]) => progressions(p).map(prog => ({ ...prog, t: id })))
@@ -84,52 +91,80 @@
   C.settings = (opts, style) => Object.assign(defaults(style.profile || profiles.bach), opts.chamber);
 
   C.controls = function (parent, sectionColumn, opts, style, sections, row, render) {
-    const { el } = SDAW, settings = opts.chamber = C.settings(opts, style);
+    const { el } = SDAW;
+    if (style.profile.romantic) SDAW.romantic.prepare(opts, style);
+    const settings = opts.chamber = C.settings(opts, style);
     tracks.forEach(spec => {
       opts.tracks[spec.id] ??= { on: spec.on !== false, inst: spec.inst, fx: 'Room', play: null };
     });
     const parts = tracks.filter(spec => opts.tracks[spec.id].on).map(spec => [spec.id, labels[spec.id] || spec.name]);
     const violinCount = violinIds.filter(id => opts.tracks[id].on).length;
-    if (parts.length && !parts.some(([id]) => id === settings.lead)) settings.lead = parts[0][0];
+    if (parts.length && settings.lead !== 'auto' && !parts.some(([id]) => id === settings.lead)) settings.lead = parts[0][0];
     const answers = parts.filter(([id]) => id !== settings.lead);
-    if (answers.length && !answers.some(([id]) => id === settings.reply)) settings.reply = answers[0][0];
+    if (answers.length && settings.reply !== 'auto' && !answers.some(([id]) => id === settings.reply)) settings.reply = answers[0][0];
     const select = (label, choices, value, set, redraw = false) => row(label, el('select', {
       'aria-label': label, onchange: e => { set(e.target.value); if (redraw) render(); }
     }, choices.map(([v, h]) => el('option', { value: v, selected: v === value ? true : null }, h))));
+    const automatic = style.profile.romantic ? [['auto', 'Vary with each idea']] : [];
+    if (style.profile.romantic) {
+      parent.append(
+        el('div', { class: 'ag-sub' }, 'Romantic ensemble'),
+        select('Ensemble', [['auto', 'Vary with each idea'], ['manual', 'Choose instruments manually'], ...SDAW.romantic.ensembles],
+          settings.ensemble, v => { settings.ensemble = v; }, true),
+        el('p', { class: 'st-note', style: { marginTop: 0 } }, parts.map(([, name]) => name).join(' · ')),
+        el('p', { class: 'st-note', style: { marginTop: 0 } }, (() => {
+          const plan = SDAW.romantic.settings(opts, style);
+          const interaction = { solo: 'Fixed lead', dialogue: 'Call and response', rotate: 'Lead rotates by section', imitation: 'Imitative counterpoint' };
+          return 'This idea · ' + SDAW.romantic.names[plan.lead] + ' · ' + interaction[plan.interaction];
+        })()),
+        select('Intro character', automatic.concat(SDAW.romantic.introCharacters), settings.introCharacter || 'auto',
+          v => { settings.introCharacter = v; }),
+        select('Piano melody', [['auto', 'Vary with the phrase'], ['single', 'Single melodic line'], ['double', 'Two-note melodic line']],
+          settings.melodyVoicing || 'auto', v => { settings.melodyVoicing = v; }),
+        select('Keyboard flourishes', [['auto', 'Varied scales and arpeggios'], ['scales', 'Ascending / descending scales'],
+          ['arpeggios', 'Ascending / descending arpeggios'], ['none', 'No flourishes']],
+          settings.flourishes || 'auto', v => { settings.flourishes = v; })
+      );
+    }
     parent.append(
       el('div', { class: 'ag-sub' }, 'Chamber arrangement'),
-      select('Lead instrument', parts, settings.lead, v => { settings.lead = v; }, true),
-      select('Interaction', [['solo', 'Fixed lead'], ['dialogue', 'Call and response'], ['rotate', 'Lead rotates by section'], ['imitation', 'Imitative counterpoint']], settings.interaction, v => { settings.interaction = v; }, true),
+      select('Lead instrument', automatic.concat(parts), settings.lead, v => { settings.lead = v; }, true),
+      select('Interaction', automatic.concat([['solo', 'Fixed lead'], ['dialogue', 'Call and response'], ['rotate', 'Lead rotates by section'], ['imitation', 'Imitative counterpoint']]), settings.interaction, v => { settings.interaction = v; }, true),
       select('Meter', [['4/4', '4/4'], ['3/4', '3/4'], ['2/4', '2/4'], ['6/8', '6/8']], settings.meter, v => { settings.meter = v; }),
       select('Violin and viola', [['auto', 'Legato with occasional pizzicato'], ['arco', 'Legato arco'], ['short', 'Spiccato / short bow'], ['pizz', 'Pizzicato']], settings.bow, v => { settings.bow = v; }),
       select('Solo technique', [['ornaments', 'Trills and fast runs'], ['runs', 'Fast runs'], ['lyrical', 'Lyrical phrasing']], settings.soloDetail, v => { settings.soloDetail = v; })
     );
-    if (['dialogue', 'imitation'].includes(settings.interaction)) {
-      parent.append(select('Answering instrument', answers, settings.reply, v => { settings.reply = v; }));
+    if (['auto', 'dialogue', 'imitation'].includes(settings.interaction)) {
+      parent.append(select('Answering instrument', automatic.concat(answers), settings.reply, v => { settings.reply = v; }));
     }
     parent.append(el('div', { class: 'ag-sub' }, 'Instrument roles'));
     const choices = [['auto', 'Follow style'], ['blend', 'Melody, arpeggios and chords'], ['arpeggio', 'Arpeggios'], ['harmony', 'Chord accompaniment'], ['counter', 'Countermelody'], ['rest', 'Tacit unless featured']];
     parts.forEach(([id, label]) => {
       const roles = isBowed(id)
         ? [['auto', 'Follow style'], ['counter', 'Countermelody'], ['sustain', 'Sustained background'], ['arpeggio', 'Broken chords'], ['rest', 'Tacit unless featured']]
-        : choices;
+        : style.profile.romantic && ['piano', 'harp'].includes(id) ? choices.concat([
+          ['bass-chord', 'Bass and chords'], ['pulse', 'Bass and chords in eighth notes'], ['alberti', 'Alberti bass'],
+          ['rolled', 'Rolled chords'], ['answer', 'Accompaniment with melodic replies'], ['waltz', 'Bass and two chord pulses']
+        ]) : choices;
       parent.append(select(label, roles, settings.role[id] || 'auto', v => { settings.role[id] = v; }));
     });
     sectionColumn.append(
       el('div', { class: 'ag-sub' }, 'Ensemble and opening'),
       select('Violin parts', violinIds.map((_, i) => [String(i + 1), String(i + 1)]).concat([['0', 'None']]), String(violinCount), v => {
         violinIds.forEach((id, i) => { opts.tracks[id].on = i < Number(v); });
+        if (style.profile.romantic) settings.ensemble = 'manual';
       }, true),
       el('button', { class: 'btn small', onclick: () => {
         tracks.forEach(t => { opts.tracks[t.id].on = isViolin(t.id); });
+        if (style.profile.romantic) settings.ensemble = 'manual';
         render();
       } }, 'Violins only'),
       select('Introduction', [['auto', 'Vary with the idea'], ['ensemble', 'Full ensemble'], ['solo', 'One instrument'], ['gradual', 'Gradual entrances']], settings.intro, v => { settings.intro = v; }, true),
-      select('Opening instrument', [['lead', 'Follow lead'], ...parts], settings.opening, v => { settings.opening = v; }),
+      select('Opening instrument', automatic.concat([['lead', 'Follow lead'], ...parts]), settings.opening, v => { settings.opening = v; }),
       select('Cadenza soloist', [['auto', 'Vary with the idea'], ['lead', 'Follow lead'], ...parts], settings.soloist, v => { settings.soloist = v; }),
       el('div', { class: 'ag-sub' }, 'Lead by section')
     );
-    sections.forEach(section => sectionColumn.append(select(section.name, [['auto', 'Follow interaction'], ...parts],
+    sections.forEach(section => sectionColumn.append(select(section.name, [['auto', 'Follow interaction'], ...(style.profile.romantic ? [['accompaniment', 'Accompaniment only']] : []), ...parts],
       settings.sections[section.name] || settings.sections[section.type] || 'auto', v => { settings.sections[section.name] = v; })));
   };
 
@@ -370,7 +405,8 @@
   }
 
   C.arrange = function (song, opts, style, sections) {
-    const settings = C.settings(opts, style), profile = style.profile;
+    const profile = style.profile;
+    const settings = profile.romantic ? SDAW.romantic.settings(opts, style) : C.settings(opts, style);
     const length = SDAW.barTicks(song), findChord = chordReader(song, opts);
     const rng = SDAW.autogen.util.makeRand(opts.seed || 1);
     const themeStart = rng.int(0, 3);
@@ -400,11 +436,13 @@
         const chord = findChord(tick);
         const pitches = chord.intervals.map(n => pc(n + chord.root));
         const responding = !manual && reply && settings.interaction === 'dialogue' && Math.floor(bar / 2) % 2;
-        const foreground = responding && !final && !opening && !isCadenza ? reply : featured;
+        let foreground = responding && !final && !opening && !isCadenza ? reply : featured;
         const available = opening ? entranceOrder.slice(0, introMode === 'solo' ? 1
           : 1 + Math.floor(bar * (entranceOrder.length - 1) / Math.max(1, section.length - 1))) : ordering;
+        const romanticPlan = profile.romantic ? SDAW.romantic.barPlan(opts, settings, section, bar, available, foreground, reply) : null;
+        if (romanticPlan) foreground = romanticPlan.leader;
         song.tracks.forEach(track => {
-          const id = track.styleTrack, bowed = isBowed(id), piano = id === 'piano';
+          const id = track.styleTrack, bowed = isBowed(id), piano = id === 'piano' || id === 'harp';
           if (!available.includes(id)) return;
           const violinPart = violinIds.indexOf(id);
           const spec = tracks.find(t => t.id === id), [nativeLow, high] = spec.range;
@@ -412,14 +450,14 @@
           const upper = violinPart >= 0 ? 76 - violinPart * 2 : id === 'viola' ? 68 : id === 'guitar' ? 67 : 72;
           const state = states.get(id);
           const texture = settings.role[id] && settings.role[id] !== 'auto' ? settings.role[id]
-            : bowed ? section.type === 'bridge' || violinPart === 1 && bar % 4 >= 2 ? 'counter' : 'sustain' : profile.texture;
-          const solo = id === foreground;
-          const imitation = !manual && !opening && !isCadenza && id === reply && id !== foreground && settings.interaction === 'imitation' && bar % 4 > 0 && !final;
+            : profile.romantic ? SDAW.romantic.texture(opts, id, section) : bowed ? section.type === 'bridge' || violinPart === 1 && bar % 4 >= 2 ? 'counter' : 'sustain' : profile.texture;
+          const solo = id === foreground && !romanticPlan?.accompaniment;
+          const imitation = !romanticPlan?.accompaniment && !manual && !opening && !isCadenza && id === reply && id !== foreground && settings.interaction === 'imitation' && bar % 4 > 0 && !final;
           const virtuosic = solo && (isViolin(id) || id === 'guitar') && !opening && (isCadenza || section.type === 'bridge')
             && settings.soloDetail !== 'lyrical' && opts.complexity > .5 && (!bowed || ['auto', 'arco'].includes(settings.bow));
           const ornament = virtuosic && bar % 2 === 1
             ? isViolin(id) && settings.soloDetail === 'ornaments' && bar % 4 === 3 ? 'trill' : 'run' : null;
-          const phrasing = { length, bar, index: themeStart, voice: 1, upper, low, high, chord, pcs: pitches, section: section.type,
+          const phrasing = { length, bar, texture, index: themeStart, voice: 1, upper, low, high, chord, pcs: pitches, section: section.type,
             rng, profile, density: opts.density, complexity: opts.complexity, mode: opts.mode, key: opts.key, guitar: id === 'guitar',
             ornament, violinPart, beat: settings.meter === '6/8' ? 6 : 4 };
           let notes = [];
@@ -434,12 +472,21 @@
               }
             }
           } else if (solo || imitation) {
-            notes = theme(state, imitation ? { ...phrasing, bar: bar - 1, upper: upper - 8, length: length / 2 } : phrasing);
+            notes = profile.romantic
+              ? SDAW.romantic.melody(opts, section, bar, id, phrasing, { nearest, barScale, resolveLine })
+              : theme(state, imitation ? { ...phrasing, bar: bar - 1, upper: upper - 8, length: length / 2 } : phrasing);
             if (imitation) notes.forEach(n => { n.at += length / 2; n.vel -= 19; });
             // the left hand stays under the melody (before, both hands met on the same keys)
-            if (piano && solo && texture !== 'rest') notes.push(...backing(state, phrasing, texture, false, true, Math.min(...notes.map(n => n.pitch))));
+            if (piano && solo && texture !== 'rest') {
+              const ceiling = Math.min(...notes.map(n => n.pitch));
+              notes.push(...(profile.romantic
+                ? SDAW.romantic.keyboard(opts, section, bar, id, phrasing, texture, ceiling, { nearest })
+                : backing(state, phrasing, texture, false, true, ceiling)));
+            }
           } else {
-            notes = backing(state, phrasing, texture, bowed, piano);
+            notes = profile.romantic && piano
+              ? SDAW.romantic.keyboard(opts, section, bar, id, phrasing, texture, Infinity, { nearest })
+              : backing(state, phrasing, texture, bowed, piano);
           }
           if (bowed && !final) {
             const art = settings.bow === 'auto'
@@ -450,6 +497,22 @@
               else if (art === 'short') n.tech = { stacc: true };
               else n.tech = { arco: true };
             });
+          }
+          if (profile.romantic) {
+            if (id === 'guitar' && solo && !final && texture !== 'rest') {
+              const melodyLow = Math.min(...notes.map(n => n.pitch));
+              const bass = guitarShape(chord, 4).find(n => n.pitch <= melodyLow - 7);
+              if (bass) [0, length / 2].forEach(at => {
+                if (!notes.some(n => n.at <= at && n.at + n.dur > at && n.pitch === bass.pitch)) {
+                  notes.push({ ...bass, at, dur: length / 2, voice: 2, vel: 56, tech: {} });
+                }
+              });
+            }
+            if (!final && available.includes(id)) {
+              notes = SDAW.romantic.flourish(notes, opts, section, bar, id, phrasing, romanticPlan, { nearest, barScale });
+            }
+            notes = SDAW.romantic.followHarmony(notes, song, tick, phrasing, { nearest, barScale });
+            SDAW.romantic.soften(notes, section, solo, bar);
           }
           assignPart(track, notes, song, section, bar, length);
         });

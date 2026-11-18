@@ -15,6 +15,7 @@
   /** Hear the track exactly as it sounds (its own engine, samples and pedals) */
   function listen(t) {
     if (t.type === 'drums') { ['kick', 'hhc', 'snare', 'hhc'].forEach((r, i) => setTimeout(() => SDAW.audio.previewDrum(t, r), i * 180)); return; }
+    if (t.engine === 'harp') { SDAW.audio.previewHarp(t); return; }
     if (t.engine === 'bowed') {
       SDAW.audio.previewBowed(t);
       return;
@@ -33,6 +34,7 @@
     { id: 'guitar', name: 'Guitar Emulator (string model)' },
     { id: 'bass', name: 'Bass Emulator (string model)' },
     { id: 'keys', name: 'Keys Engine' },
+    { id: 'harp', name: 'Concert Harp (acoustic recordings)' },
     { id: 'bowed', name: 'Bowed Strings (recorded)' },
     { id: 'strings', name: 'Ensemble Engine' },
     { id: 'synth', name: 'Synth Engine' },
@@ -130,7 +132,7 @@
     const slot = section('sound', 'Sound Slot', [
       el('div', { class: 'inst-card' }, [
         el('span', { class: 'big-ico' }, rig ? (GL.TYPES[RG.model(t)].icon || '🎸') : prig ? (PL.TYPES[PR.model(t)].icon || '🎹') : wrig ? (WL.TYPES[WR.model(t)].icon || '🎷') : SDAW.TRACK_ICONS[t.type] || '🎵'),
-        el('div', {}, [el('b', {}, t.instrument), el('small', {}, (t.sampler ? 'Real samples: ' + t.sampler.zones.length + ' zone(s) from your library' : rig ? 'Guitar Rig · real recordings, real amps and cabinets' : prig ? 'Piano Rig · ' + PL.TYPES[PR.model(t)].name : wrig ? 'Wind Rig · ' + WL.TYPES[WR.model(t)].name + ' (real recordings)' : t.engine === 'bowed' ? (t.source || 'Acoustic recordings') : 'Built-in preview engine') + ' · drop an instrument or a sample here')])
+        el('div', {}, [el('b', {}, t.instrument), el('small', {}, (t.sampler ? 'Real samples: ' + t.sampler.zones.length + ' zone(s) from your library' : rig ? 'Guitar Rig · real recordings, real amps and cabinets' : prig ? 'Piano Rig · ' + PL.TYPES[PR.model(t)].name : wrig ? 'Wind Rig · ' + WL.TYPES[WR.model(t)].name + ' (real recordings)' : ['bowed', 'harp'].includes(t.engine) ? (t.source || 'Acoustic recordings') : 'Built-in preview engine') + ' · drop an instrument or a sample here')])
       ]),
       prig ? el('div', { class: 'insp-row rig-row' }, [
         el('button', { class: 'btn primary rig-open', 'data-help': 'Open the Piano Rig of this track: instrument, colour and brightness, pedal, strings, electric piano amp, synth, organ drawbars and rotary speaker, effects', onclick: () => SDAW.prigPanel.open(t.id) }, '🎹 Open Piano Rig…')

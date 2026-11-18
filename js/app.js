@@ -391,7 +391,13 @@
     const role = t => SDAW.autogen ? SDAW.autogen.autoRole(t, song) : '';
     const isLead = t => specOf(t)?.lead || (specs ? false : /lead/i.test(t.name));
     // chamber music: the lead instrument chosen in the Classical panel
-    const chamberLead = song.gen?.opts?.chamber?.lead || (song.gen?.opts?.genre === 'Classical' && SDAW.classical ? SDAW.classical.settings(song.gen.opts, SDAW.songgen.styleOf(song.gen.opts)).lead : null);
+    let chamberLead = song.gen?.opts?.chamber?.lead || null;
+    if (song.gen?.opts?.genre === 'Classical' && SDAW.classical) {
+      const options = song.gen.opts, style = SDAW.songgen.styleOf(options);
+      chamberLead = style.profile?.romantic
+        ? SDAW.romantic.settings(options, style).lead
+        : SDAW.classical.settings(options, style).lead;
+    }
     return tracks.find(t => t.type === 'guitar' && isLead(t))
       || tracks.find(t => t.type === 'guitar' && /lead guitar/i.test(t.name))
       || (chamberLead && tracks.find(t => t.styleTrack === chamberLead))
