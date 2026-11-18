@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de usuario · ScoreDAW</title>
+<link rel="stylesheet" href="manual.css">
+</head>
+<body id="arriba">
+<a class="skip-link button" href="#contenido">Ir al contenido</a>
+<div class="shell">
+<aside class="side">
+<a class="brand" href="#arriba"><img src="../assets/scoredaw-logo.svg" alt="">ScoreDAW</a>
+<a class="back" href="../index.html">← Abrir ScoreDAW</a>
+<a class="back" href="en.html" lang="en" hreflang="en">Read in English</a>
+<nav aria-label="Índice del manual">
+<a href="#inicio">1. Primera canción</a>
+<a href="#mapa">2. Mapa de la interfaz</a>
+<a href="#transporte">3. Reproducción y compás</a>
+<a href="#biblioteca">4. Biblioteca y sonidos</a>
+<a href="#arreglo">5. Pistas, bloques y secciones</a>
+<a href="#entrada">6. Escribir música</a>
+<a href="#editores">7. Editores y partitura</a>
+<a href="#generacion">8. Generar música</a>
+<a href="#sonido">9. Inspector, mezcla y efectos</a>
+<a href="#grabacion">10. Grabar y conectar MIDI</a>
+<a href="#exportacion">11. Guardar, exportar e imprimir</a>
+<a href="#ajustes">12. Ajustes y solución de problemas</a>
+<a href="#menus">13. Referencia de menús y atajos</a>
+<a href="#creditos">14. Versión y créditos</a>
+</nav>
+</aside>
+<main id="contenido">
+<header class="hero">
+<span class="version">ScoreDAW · versión 0.2.0</span>
+<h1>Manual de usuario</h1>
+<p>Escribe, genera, graba y mezcla una canción. Usa el índice para aprender por pasos o localizar un control. Los nombres en negrita coinciden con los que verás en la interfaz en inglés.</p>
+<div class="actions"><a class="button primary" href="#inicio">Crear mi primera canción</a><a class="button" href="#menus">Consultar menús y atajos</a></div>
+</header>
+
+<section id="inicio"><h2>1. Crea tu primera canción</h2>
+<ol>
+<li>Abre <strong>File → New project</strong>. En la bienvenida puedes empezar con un estilo, escribir para guitarra, hacer un ritmo, abrir un proyecto o crear un proyecto vacío.</li>
+<li>Elige <strong>Start with a style</strong> y un género. Usa <strong>Choose everything…</strong> si quieres escoger instrumentos, tonalidad y estructura antes de generar.</li>
+<li>Pulsa <kbd>Espacio</kbd> o <strong>Play</strong>. En <strong>Song / Arrange</strong> verás las pistas y el cursor de reproducción.</li>
+<li>Selecciona un bloque de guitarra y abre <strong>Score + Tab</strong>. Usa <strong>✎ Edit title</strong> para ponerle nombre a la canción.</li>
+<li>Guárdala con <strong>File → Save as</strong>. Para compartirla como audio, usa <strong>File → Export audio</strong>.</li>
+</ol>
+<figure><a href="images/inicio.png"><img src="images/inicio.png" alt="Bienvenida con las opciones para generar un estilo, escribir para guitarra y crear un ritmo"></a><figcaption>La bienvenida ofrece plantillas, un proyecto vacío y el ajuste del compás para empezar a escribir.</figcaption></figure>
+<div class="diagram" aria-label="Flujo de trabajo"><span>Crear o abrir</span><b aria-hidden="true">→</b><span>Componer</span><b aria-hidden="true">→</b><span>Editar y mezclar</span><b aria-hidden="true">→</b><span>Guardar y exportar</span></div>
+</section>
+
+<section id="mapa"><h2>2. Mapa de la interfaz</h2>
+<figure><a href="images/interfaz.png"><img src="images/interfaz.png" alt="Vista completa de ScoreDAW con barra superior, biblioteca, arreglo, entrada, editor e inspector" loading="lazy"></a><figcaption>Abre la imagen para verla a tamaño completo. La biblioteca está a la izquierda, los editores en el centro y el Inspector a la derecha.</figcaption></figure>
+<div class="cards">
+<article><h3>Barra superior</h3><p>Menús, archivo, deshacer, transporte, contador, tempo, tonalidad, compás, tamaño de interfaz y modos <strong>Simple / Pro</strong>.</p></article>
+<article><h3>Library</h3><p>Busca y preescucha sonidos, instrumentos, patrones, ritmos, progresiones, presets y efectos. Arrastra elementos sobre su destino.</p></article>
+<article><h3>Song / Arrange</h3><p>Vista de pistas y bloques en el tiempo. Contiene <strong>Add Track</strong>, generación, grabación y zoom del arreglo.</p></article>
+<article><h3>Input</h3><p>Elige <strong>Fretboard</strong>, <strong>Piano</strong> o <strong>Chords</strong>, la duración y si quieres escribir o escuchar.</p></article>
+<article><h3>Editor</h3><p><strong>Pattern</strong>, <strong>Piano Roll</strong>, <strong>Score</strong>, <strong>Tab</strong>, <strong>Score + Tab</strong>, <strong>Mixer</strong> y <strong>Generator</strong>.</p></article>
+<article><h3>Inspector</h3><p>Parámetros de la pista, el bloque o la nota seleccionada. Configura sonido, grabación, MIDI y efectos.</p></article>
+</div>
+<p>La barra inferior explica el control bajo el puntero. <kbd>Alt+1</kbd> a <kbd>Alt+5</kbd> pliegan los paneles y <kbd>Alt+0</kbd> recupera la disposición. Usa <strong>Pro</strong> para mostrar los controles avanzados.</p>
+</section>
+
+<section id="transporte"><h2>3. Reproduce desde el lugar que quieres</h2>
+<ol>
+<li>Usa <strong>SONG</strong> para reproducir el arreglo completo y <strong>PAT</strong> para repetir un patrón. El transporte pequeño del editor permite escuchar el patrón seleccionado con <kbd>Shift+Espacio</kbd>.</li>
+<li>En el arreglo, pulsa la regla o un bloque para colocar el punto de inicio. Usa <kbd>Alt</kbd> al hacer clic para elegir un paso dentro del compás.</li>
+<li><strong>Pause</strong> conserva la posición. <strong>Play</strong> continúa desde allí. <strong>Stop</strong> vuelve al inicio y <kbd>Home</kbd> también lleva el cursor al principio.</li>
+<li>Activa <strong>Loop</strong> o <kbd>L</kbd> si quieres repetir una sección. En <strong>Pattern → Loop bar</strong> puedes repetir el compás con todos sus canales.</li>
+</ol>
+<p>El contador muestra tiempo, compás, pulso y posición. En reproducción, la partitura se desplaza para seguir la línea rosa y el rack resalta el paso y los golpes de batería que suenan. Ajusta <strong>Tempo</strong>, <strong>Key</strong> (nota y modo), <strong>Time Sig.</strong> y el metrónomo en la barra superior.</p>
+<details><summary>Cambiar de compás en un proyecto ya escrito</summary><p>Si la aplicación pregunta qué hacer con los bloques, elige conservar los compases para recortar o rellenar las barras, o conservar la música en el tiempo para mover sus divisiones. Revisa el resultado antes de guardar. Puedes deshacer la operación.</p></details>
+</section>
+
+<section id="biblioteca"><h2>4. Encuentra y asigna sonidos</h2>
+<div class="table"><table><thead><tr><th>Pestaña</th><th>Qué puedes hacer</th></tr></thead><tbody>
+<tr><td>Sounds</td><td>Kits, instrumentos y sonidos de percusión disponibles. Escucha un sonido o arrástralo a la pista, al <strong>Sound Slot</strong> o al nombre de un pad.</td></tr>
+<tr><td>Generators / Synths</td><td>Presets de síntesis, sampler, modelos de cuerdas, teclados y percusión. Añádelos al rack o cambia el instrumento de un canal.</td></tr>
+<tr><td>Folders</td><td>Conecta una carpeta para explorar tus sonidos. Tras recargar, usa <strong>Reconnect</strong> si el navegador solicita acceso. Con el menú contextual puedes crear un instrumento por muestras o un kit a partir de sus nombres.</td></tr>
+<tr><td>Patterns / Rhythms</td><td>Reutiliza patrones y grooves. Arrastra un patrón al arreglo o carga un ritmo desde el selector <strong>Groove…</strong> del rack.</td></tr>
+<tr><td>Chords</td><td>Inserta acordes y progresiones en el cursor o arrástralos al editor.</td></tr>
+<tr><td>Presets / Effects</td><td>Aplica configuraciones de instrumentos y efectos. Revisa la cadena resultante en el Inspector o el Mixer.</td></tr>
+<tr><td>Favorites</td><td>Filtra los elementos que hayas marcado como favoritos. Usa el campo de búsqueda para localizar instrumentos, ritmos y acordes.</td></tr>
+</tbody></table></div>
+<div class="diagram"><span>Archivo de audio</span><b aria-hidden="true">→</b><span>Arreglo · bloque de audio</span><span>Pad · golpe</span><span>Sound Slot · instrumento</span></div>
+<p>Los paquetes opcionales amplían <strong>Sounds</strong>. Si aparece el aviso de paquetes sin construir, puedes seguir usando los instrumentos incluidos y las carpetas conectadas. En la copia de desarrollo, el proyecto incluye <code>Build Sound Packs.cmd</code> para preparar las bibliotecas compatibles que tengas instaladas.</p>
+</section>
+
+<section id="arreglo"><h2>5. Organiza pistas, bloques y secciones</h2>
+<ol>
+<li>Haz clic en <strong>Add Track</strong> y elige el instrumento. En la cabecera puedes seleccionar la pista, silenciarla con <strong>M</strong>, escucharla sola con <strong>S</strong>, armar la grabación y ajustar el volumen y panorama.</li>
+<li>Arrastra un patrón de <strong>Library → Patterns</strong> a la cuadrícula. Mueve el bloque con el ratón. <kbd>Alt</kbd> ajusta al pulso y <kbd>Ctrl</kbd> al arrastrar copia el bloque.</li>
+<li>Arrastra sus bordes para recortar o extender. El patrón se repite dentro de un bloque más largo. Haz doble clic para editar o clic derecho para renombrar, dividir, borrar o crear una copia independiente.</li>
+<li>Usa la regla y la fila de secciones para recorrer intro, verso, coro, puente, solo y final. Desde la regla puedes insertar compases. Ajusta <strong>Zoom</strong> para revisar frases cortas o el arreglo completo.</li>
+</ol>
+<div class="tip"><p><strong>Patrones vinculados.</strong> Un bloque con <strong>×N</strong> comparte sus notas o golpes con otros bloques. Usa <strong>Make unique</strong> antes de hacer una variación que deba sonar en un solo sitio.</p></div>
+<p>Los clips de audio pueden dividirse, invertirse y recibir fundidos desde el menú contextual. <kbd>S</kbd> divide en el cursor cuando el arreglo tiene el foco. La pista de audio y el patrón de notas se editan en sus respectivos controles.</p>
+</section>
+
+<section id="entrada"><h2>6. Escribe con el mástil, el piano o los acordes</h2>
+<div class="cards">
+<article><h3>Fretboard</h3><p>Elige un traste y cuerda. Activa <strong>Write</strong> para insertar la nota en el cursor. Con <kbd>Shift</kbd> puedes escribir un acorde. El selector de escala y <strong>Show scale</strong> marcan las notas de referencia.</p></article>
+<article><h3>Piano</h3><p>Toca las teclas del panel o usa el teclado del ordenador. El rango cambia con <kbd>[</kbd> y <kbd>]</kbd>. Activa <strong>Write</strong> y elige la duración para colocar notas.</p></article>
+<article><h3>Chords</h3><p>Selecciona raíz, tipo y disposición del acorde. Escúchalo y colócalo en el cursor o úsalo como referencia para la progresión. <kbd>Shift+1</kbd> a <kbd>Shift+7</kbd> recorre los grados de la tonalidad.</p></article>
+<article><h3>Duración y cursor</h3><p>Escoge duración antes de escribir. Si ya hay notas seleccionadas, puedes cambiar sus valores desde la paleta de partitura. La misma nota se refleja en los demás editores.</p></article>
+</div>
+<figure><a href="images/acordes.png"><img src="images/acordes.png" alt="Panel Chords con los controles del constructor de acordes" loading="lazy"></a><figcaption>El panel <strong>Chords</strong> muestra el acorde que puedes escuchar o insertar.</figcaption></figure>
+</section>
+
+<section id="editores"><h2>7. Edita con la vista adecuada</h2>
+<h3>Pattern · F2</h3>
+<figure><a href="images/patron.png"><img src="images/patron.png" alt="Rack de patrones con pasos, canales y pads de batería" loading="lazy"></a><figcaption>Usa las flechas de compás y abre el canal de batería para editar los pads individualmente.</figcaption></figure>
+<p>En batería, pulsa una celda para activar o quitar un golpe. <kbd>Shift</kbd> aplica el acento. El nombre de un pad permite escucharlo y el menú contextual permite cambiar su sonido. En canales melódicos elige <strong>Step note</strong> (raíz del acorde, acorde completo, raíz de la tonalidad u octava) y duración. <strong>Clear bar</strong> vacía la parte del canal y el menú del patrón permite renombrar, clonar, cambiar longitud, colocar o borrar.</p>
+<h3>Piano Roll · F3</h3>
+<figure><a href="images/piano-roll.png"><img src="images/piano-roll.png" alt="Piano Roll de ScoreDAW con el teclado lateral y la cuadrícula de notas" loading="lazy"></a><figcaption>La posición horizontal es el tiempo. La fila corresponde a la altura. La franja inferior controla la velocidad.</figcaption></figure>
+<p>Pulsa un espacio para añadir una nota. Arrastra una nota para moverla y su borde derecho para ajustar duración. <kbd>Shift</kbd> añade notas a la selección. Clic derecho borra. Usa los controles para cuantizar a semicorchea, transponer por semitonos u octava y cambiar la velocidad de las notas en la franja inferior.</p>
+<h3>Score, Tab y Score + Tab · F4, F5 y F6</h3>
+<figure><a href="images/partitura.png"><img src="images/partitura.png" alt="Partitura y tablatura ligadas con el título centrado y la paleta de notación" loading="lazy"></a><figcaption>La paleta está a la izquierda. El botón <strong>Edit title</strong> está junto a <strong>Palette</strong>.</figcaption></figure>
+<ol>
+<li>Escoge la pista en el selector del editor. <strong>Score</strong> muestra notación estándar, <strong>Tab</strong> muestra guitarra o bajo y <strong>Score + Tab</strong> combina ambas. El piano puede mostrar dos pentagramas.</li>
+<li>Haz clic en una posición o arrastra un área para seleccionar. En tablatura escribe el número de traste con <kbd>0</kbd> a <kbd>9</kbd>. Pulsa dos dígitos seguidos para trastes de dos cifras.</li>
+<li>Usa <strong>Palette</strong> para elegir voz 1–4, duración, puntillo, tresillo, silencio, ligadura y desplazamiento de las notas siguientes. Las flechas mueven el cursor y <kbd>Ctrl+←</kbd> o <kbd>Ctrl+→</kbd> salta un compás.</li>
+<li>Añade dinámica, reguladores y articulaciones. En guitarra y bajo puedes aplicar palm mute, let ring, nota fantasma o muerta, hammer-on, pull-off, tapping, vibrato, armónicos, slides y bends. Selecciona dos notas para revisar un slide de unión.</li>
+<li>En <strong>Bars</strong>, sobre el compás del cursor, configura repetición, casillas, doble barra, segno, coda, Fine, D.C., D.S. o texto. Comprueba el orden escuchando la canción.</li>
+</ol>
+<p>El ancho de cada compás se ajusta a sus notas y símbolos. Las figuras rápidas pueden agruparse por pulso. Un compás especialmente denso puede requerir desplazamiento horizontal. Renombra la canción con <strong>Edit title</strong> o <strong>File → Song title</strong>.</p>
+</section>
+<section id="generacion"><h2>8. Genera una canción o una pista</h2>
+<div class="cards"><article><h3>Auto Generate Full Song</h3><p>Crea el arreglo completo con secciones y pistas. <kbd>Ctrl+Shift+G</kbd>.</p></article>
+<article><h3>Auto Generate Track</h3><p>Escribe una parte que encaje en la canción abierta. <kbd>Ctrl+G</kbd>.</p></article></div>
+<h3>Canción completa</h3>
+<figure><a href="images/cancion.png"><img src="images/cancion.png" alt="Diálogo Auto Generate Full Song con columnas de género, armonía y banda" loading="lazy"></a><figcaption>Elige estilo y forma a la izquierda, ajusta progresiones y melodía en el centro y configura los instrumentos a la derecha.</figcaption></figure>
+<ol>
+<li>Selecciona <strong>Genre</strong> o un perfil en <strong>Bands</strong>. Los estilos con <strong>Kind of song</strong> tienen variantes. En <strong>Rock</strong> puedes elegir <strong>Acoustic Guitar</strong>. <strong>Extreme</strong> ofrece <strong>Funk metal</strong> y <strong>Acoustic ballad</strong> con Nuno Bettencourt.</li>
+<li>Escoge tonalidad, modo, tempo, forma <strong>Short / Standard / Extended</strong> y <strong>Ending</strong>. La resolución se prolonga mediante ligadura. Los finales de Jazz permiten cadencias con acordes como 6/9, maj9 o maj13.</li>
+<li>Deja una progresión en <strong>Auto</strong> o cámbiala por sección. Los números romanos se transponen a la tonalidad elegida. Cuando aparezca <strong>Reference artist</strong>, puedes elegir sus patrones y hábitos musicales.</li>
+<li>Ajusta <strong>Complexity</strong>, <strong>Density</strong> e <strong>Idea</strong>. La misma semilla y opciones permiten repetir el arreglo. El dado cambia la idea. Activa según el estilo líneas complejas, carreras rápidas, tresillos, mezcla de modos, slides, armónicos, bends y vibrato.</li>
+<li>Elige el guitarrista en <strong>Lead guitar in the style of</strong> y qué hará en cada sección. Puedes pedir melodía, riff, solo, respuestas o silencio. En la banda, incluye o excluye pistas y elige instrumento, patrón de interpretación y efectos. Añade instrumentos, contramelodías o una segunda voz instrumental.</li>
+<li>Cuando esté disponible, selecciona modo instrumental o cantante, voz y coros. En <strong>Guitars</strong> elige Guitar Rig o el modelo ligero. Pulsa <strong>Generate Full Song</strong>.</li>
+</ol>
+<div class="tip"><p>Generar la canción completa reemplaza el arreglo activo. Guarda tu proyecto si quieres conservarlo. Puedes volver con <kbd>Ctrl+Z</kbd>.</p></div>
+<h3>Pista compatible con la canción actual</h3>
+<figure><a href="images/pista.png"><img src="images/pista.png" alt="Diálogo Auto Generate Track con análisis a la izquierda y parámetros de la pista a la derecha" loading="lazy"></a><figcaption>Comprueba el análisis de armonía y secciones antes de aplicar la generación.</figcaption></figure>
+<ol>
+<li>Selecciona la pista, el género y su papel. Según la pista podrás elegir melodía, contramelodía, armonía, rasgueo, arpegio, bajo, metales o batería.</li>
+<li>Configura <strong>Plays</strong>, registro, densidad, complejidad y semilla. Selecciona las secciones de destino y decide si vas a reemplazar bloques o rellenar huecos.</li>
+<li>En <strong>Options</strong> puedes vincular patrones iguales, variar repeticiones, aplicar técnicas, escribir acordes y secciones o añadir intro y final. Ajusta si la pista debe dejar silencio durante la intro cuando se ofrezca esa opción.</li>
+<li>Genera, escucha y edita el resultado en Pattern, Piano Roll o Score + Tab. Deshaz para probar otra semilla.</li>
+</ol>
+</section>
+
+<section id="sonido"><h2>9. Configura instrumentos, mezcla y efectos</h2>
+<h3>Inspector</h3>
+<div class="table"><table><thead><tr><th>Bloque</th><th>Controles</th></tr></thead><tbody>
+<tr><td>Track</td><td>Nombre, volumen, panorama y estado de la pista.</td></tr>
+<tr><td>Sound Slot</td><td>Motor e instrumento, botón Listen y acceso al Rig disponible. Arrastra un instrumento o una muestra para asignarlo.</td></tr>
+<tr><td>Selected Block</td><td>Propiedades del bloque de patrón o audio seleccionado en el arreglo.</td></tr>
+<tr><td>Recording &amp; MIDI Out</td><td>Armar entrada y buscar puertos MIDI, elegir salida y canal.</td></tr>
+<tr><td>Articulations / Guitar Techniques</td><td>Selecciona notas para aplicar la técnica. Ajusta el rango de bend y el tiempo de slide. El Rig contiene controles adicionales.</td></tr>
+<tr><td>Pedalboard (Track FX)</td><td>Enciende o apaga pedales y ajusta sus parámetros. Los Rigs tienen sus propios efectos.</td></tr>
+<tr><td>Note Properties</td><td>Propiedades de la selección. La selección se comparte entre los editores.</td></tr>
+<tr><td>Plugins (VST3 / CLAP)</td><td>Disponible cuando el motor nativo de Windows está activo. Permite cargar y editar plugins externos.</td></tr>
+</tbody></table></div>
+<h3>Mixer · F7</h3>
+<figure><a href="images/mezclador.png"><img src="images/mezclador.png" alt="Mezclador con canales, faders, medidores y efectos" loading="lazy"></a><figcaption>Mezcla por canal y revisa el nivel de salida en el maestro.</figcaption></figure>
+<p>Equilibra volumen y panorama, escucha un canal con Solo, compara con y sin efectos y ajusta los envíos de reverberación y delay. Empieza bajando pistas que dominan la mezcla y vigila el medidor maestro para evitar saturación.</p>
+<p>Para automatizar, pulsa <strong>A</strong> en el arreglo hasta mostrar el carril de volumen o panorama. Haz clic para añadir puntos, arrastra para ajustar y usa clic derecho para borrar. La automatización se aplica al reproducir y exportar.</p>
+<h3>Generator · F8 y paneles Rig</h3>
+<figure><a href="images/generador.png"><img src="images/generador.png" alt="Panel Generator del instrumento seleccionado con controles de sonido" loading="lazy"></a><figcaption>Los controles cambian con el motor de la pista. Los Rigs se abren desde Sound Slot.</figcaption></figure>
+<details><summary>Síntesis y sampler</summary><p>En <strong>3x Osc</strong> ajusta forma de onda, mezcla y afinación de osciladores, filtro, envolvente ADSR, LFO y glide según el preset. En <strong>Sampler</strong> asigna muestras o zonas y revisa su nota raíz. En el modelo de cuerda ajusta timbre, ataque, decaimiento y técnicas.</p></details>
+<details><summary>Guitar Rig, Piano Rig y Wind Rig</summary><p><strong>Guitar Rig</strong> combina instrumento, pastilla o toma, amplificador, caja, micrófono, EQ y efectos. <strong>Piano Rig</strong> ajusta tipo de teclado, pedal, cuerdas, amplificador y efectos según el modelo. <strong>Wind Rig</strong> ofrece articulación, respiración, vibrato y mute según el instrumento. Si se están cargando grabaciones, algunos motores pueden usar el modelo ligero durante la espera.</p></details>
+<details><summary>Instrumentos externos en Windows</summary><p>Con la edición de escritorio y su motor nativo disponible, usa <strong>Plugins (VST3 / CLAP)</strong> en el Inspector. Selecciona el plugin en la pista, abre su editor y guarda el proyecto para conservar los ajustes. La versión web ofrece sus motores internos, muestras y MIDI Out.</p></details>
+</section>
+
+<section id="grabacion"><h2>10. Graba audio o notas MIDI</h2>
+<div class="diagram"><span>Micrófono o interfaz</span><b aria-hidden="true">→</b><span>Settings → Audio</span><b aria-hidden="true">→</b><span>Armar pista</span><b aria-hidden="true">→</b><span>Record</span></div>
+<ol>
+<li>En <strong>File → Audio devices</strong> escoge la entrada. Pulsa <strong>Test 6 s</strong> y concede permiso al navegador.</li>
+<li>Crea o selecciona la pista, arma la grabación y elige el punto de inicio en el arreglo. Pulsa <strong>Record Audio</strong> o el botón rojo del transporte.</li>
+<li>Detén la reproducción y revisa el nuevo clip. Si queda adelantado o atrasado, ajusta <strong>Recording offset (ms)</strong> en Audio. Puedes moverlo, dividirlo y aplicar fundidos.</li>
+<li>Para grabar notas, desarma la entrada de audio, conecta un controlador habilitado en <strong>MIDI devices</strong> o toca con el piano virtual. El resultado se edita como notas.</li>
+</ol>
+<p>Para disparar un sintetizador externo, busca salidas en <strong>Inspector → Recording &amp; MIDI Out</strong>, elige puerto y canal y decide si se oye también el motor interno. El canal 10 se usa convencionalmente para batería General MIDI.</p>
+</section>
+
+<section id="exportacion"><h2>11. Guarda, exporta e imprime</h2>
+<figure><a href="images/exportar.png"><img src="images/exportar.png" alt="Diálogo Export con pestañas de audio, MIDI, MusicXML e impresión" loading="lazy"></a><figcaption>Usa <strong>File → Export</strong> para elegir el formato. El título del proyecto se usa en la salida.</figcaption></figure>
+<div class="table"><table><thead><tr><th>Salida</th><th>Qué contiene y qué elegir</th></tr></thead><tbody>
+<tr><td>Proyecto <code>.sdaw.json</code></td><td>Arreglo, pistas, notas, parámetros y muestras utilizadas. Usa <strong>Save as</strong> para conservar una copia independiente y <strong>Open</strong> para recuperarla.</td></tr>
+<tr><td>WAV / MP3</td><td>Mezcla de audio. Selecciona formato, tasa de muestreo, profundidad del WAV o bitrate del MP3. La normalización es opcional. Activa <strong>Stems</strong> para obtener un WAV por pista en ZIP.</td></tr>
+<tr><td>MIDI</td><td>Notas, tempo, compás y metadatos de arreglo. Configura las opciones de batería y repeticiones según el destino. El DAW receptor asignará sus propios instrumentos a las notas.</td></tr>
+<tr><td>MusicXML</td><td>Partitura editable en un programa compatible. Elige pistas y si quieres incluir símbolos de acordes y pentagrama de tablatura.</td></tr>
+<tr><td>Print / Save as PDF</td><td>Selecciona pistas y vista Score, Tab o Score + Tab. Abre la vista de impresión del navegador y elige imprimir o guardar como PDF.</td></tr>
+</tbody></table></div>
+<p>Si necesitas volver a editar, guarda también el archivo de proyecto. El autoguardado del navegador ayuda a retomar la sesión en el mismo perfil, mientras que el archivo te permite abrirla en otro equipo.</p>
+</section>
+
+<section id="ajustes"><h2>12. Ajustes y solución de problemas</h2>
+<figure><a href="images/ajustes.png"><img src="images/ajustes.png" alt="Ajustes de dispositivos, latencia, prueba de entrada y volúmenes" loading="lazy"></a><figcaption><strong>File → Settings</strong> agrupa Audio, MIDI, Library folders y General.</figcaption></figure>
+<ul>
+<li><strong>Audio.</strong> Selecciona salida y entrada, prueba el nivel, ajusta latencia, compensación de grabación y volumen de maestro y metrónomo. Recarga si el selector de latencia lo indica.</li>
+<li><strong>MIDI.</strong> Activa las entradas de controladores, comprueba el indicador de actividad y revisa las salidas disponibles.</li>
+<li><strong>Library folders.</strong> Conecta carpetas de muestras o explora las rutas configuradas. El soporte de conexión depende del navegador y de los permisos concedidos.</li>
+<li><strong>General.</strong> Ajusta escala de interfaz, modo de inicio, pantalla de bienvenida y disposición de paneles.</li>
+</ul>
+<details><summary>La canción no suena</summary><p>Pulsa Play para activar el audio del navegador. Comprueba dispositivo de salida, volumen maestro, Mute/Solo y que el cursor esté en un lugar con bloques. Si elegiste un instrumento con grabaciones, espera a que termine la carga o prueba el motor ligero.</p></details>
+<details><summary>La vista de impresión no se abre</summary><p>Permite ventanas emergentes para ScoreDAW, elige una pista melódica y vuelve a abrir <strong>File → Print / Save as PDF</strong>.</p></details>
+<details><summary>Falta un panel o los controles son pequeños</summary><p>Prueba <strong>View → Reset panel layout</strong> o <kbd>Alt+0</kbd>. Ajusta el tamaño con <kbd>Ctrl +</kbd>, <kbd>Ctrl −</kbd> o <kbd>Ctrl+0</kbd>. Algunos controles aparecen en modo <strong>Pro</strong> o al seleccionar una pista o nota compatible.</p></details>
+</section>
+
+<section id="menus"><h2>13. Referencia de menús y atajos</h2>
+<div class="table"><table><thead><tr><th>Menú</th><th>Opciones</th></tr></thead><tbody>
+<tr><td>File</td><td>New project, Open, Save, Save as, Export, Export audio, Export MIDI, Export MusicXML, Print / Save as PDF, Settings, Audio devices, MIDI devices, Library folders y Song title.</td></tr>
+<tr><td>Edit</td><td>Undo, Redo, Delete selected notes y Select all notes of track.</td></tr>
+<tr><td>Track</td><td>Add track, Duplicate selected track, Delete selected track, New notes pattern, New drum pattern, Song length y Connect sound folder.</td></tr>
+<tr><td>Score</td><td>Score + Tab, Score only, Tab only e Insert chord (Chord Builder).</td></tr>
+<tr><td>Tools</td><td>Auto Generate Track, Auto Generate Full Song, Song Builder, Load style groove, Metronome, Simple mode y Pro mode.</td></tr>
+<tr><td>View</td><td>Pattern, Piano Roll, Mixer, Generator, Library panel, Song / Arrange panel, Input panel, Editor panel, Inspector panel, Reset panel layout e Interface (Auto size, larger, smaller).</td></tr>
+<tr><td>Help</td><td>User Manual (English), Manual de usuario (Español), Help &amp; shortcuts y About.</td></tr>
+</tbody></table></div>
+<div class="table"><table><thead><tr><th>Atajo</th><th>Acción</th></tr></thead><tbody>
+<tr><td><kbd>Espacio</kbd> / <kbd>Shift+Espacio</kbd></td><td>Reproducir o pausar canción / escuchar patrón en bucle.</td></tr>
+<tr><td><kbd>Home</kbd>, <kbd>R</kbd>, <kbd>L</kbd>, <kbd>M</kbd>, <kbd>P</kbd></td><td>Inicio, grabar, bucle, metrónomo, alternar SONG y PAT. El foco del editor o el teclado de piano puede asignar otras funciones a estas letras.</td></tr>
+<tr><td><kbd>Ctrl+N</kbd>, <kbd>Ctrl+O</kbd>, <kbd>Ctrl+S</kbd>, <kbd>Ctrl+Shift+S</kbd></td><td>Nuevo, abrir, guardar, guardar como.</td></tr>
+<tr><td><kbd>Ctrl+G</kbd>, <kbd>Ctrl+Shift+G</kbd>, <kbd>Ctrl+E</kbd>, <kbd>Ctrl+P</kbd>, <kbd>Ctrl+,</kbd></td><td>Generar pista, generar canción, exportar, imprimir y abrir ajustes.</td></tr>
+<tr><td><kbd>Ctrl+Z</kbd>, <kbd>Ctrl+Y</kbd>, <kbd>Ctrl+A</kbd>, <kbd>Delete</kbd>, <kbd>Esc</kbd></td><td>Deshacer, rehacer, seleccionar todo, borrar, cerrar diálogo o limpiar selección.</td></tr>
+<tr><td><kbd>F1</kbd>–<kbd>F8</kbd></td><td>Ayuda, Pattern, Piano Roll, Score, Tab, Score + Tab, Mixer, Generator.</td></tr>
+<tr><td><kbd>Alt+1</kbd>–<kbd>Alt+5</kbd>, <kbd>Alt+0</kbd></td><td>Plegar Library, Arrange, Input, Editor o Inspector y restablecer paneles.</td></tr>
+<tr><td><kbd>Ctrl +</kbd> / <kbd>Ctrl −</kbd> / <kbd>Ctrl+0</kbd></td><td>Agrandar, reducir y volver a escala automática.</td></tr>
+<tr><td><kbd>←</kbd> / <kbd>→</kbd>, <kbd>↑</kbd> / <kbd>↓</kbd>, <kbd>+</kbd> / <kbd>−</kbd></td><td>En notación, mover el cursor, cambiar cuerda o altura y cambiar duración.</td></tr>
+<tr><td><kbd>H</kbd> <kbd>P</kbd> <kbd>T</kbd> <kbd>S</kbd> <kbd>B</kbd> <kbd>V</kbd> <kbd>X</kbd> <kbd>O</kbd> <kbd>K</kbd> <kbd>G</kbd></td><td>En notación, hammer, pull-off, tapping, slide, bend, vibrato, nota muerta, armónico, palm mute y nota fantasma.</td></tr>
+<tr><td><kbd>Z S X D C V G B H N J M</kbd> / <kbd>Q 2 W 3 E R 5 T 6 Y 7 U I</kbd></td><td>Dos filas de notas del piano por teclado. Usa <kbd>[</kbd> o <kbd>]</kbd> para desplazar la octava.</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="creditos"><h2>14. Versión y créditos</h2>
+<p><strong>ScoreDAW 0.2.0</strong>. Creado 100 % con IA usando <strong>Claude (Anthropic)</strong> y <strong>ChatGPT (OpenAI)</strong>, bajo la dirección de Roberto. El código de ScoreDAW se distribuye bajo licencia MIT. Cada componente y grabación de terceros conserva su licencia.</p>
+<div class="table"><table><thead><tr><th>Recurso</th><th>Autoría y licencia</th></tr></thead><tbody>
+<tr><td>Grabaciones de guitarra</td><td><strong>FreePats</strong>, entrada directa estilo Strat (CC0 1.0). <strong>Gestalt LUR</strong>, Strat alternativa (MIT). <strong>Karoryfer Samples / D. Smolken</strong>, Emilyguitar y Shinyguitar (CC0 1.0). <strong>Jeff Learman</strong>, Martin HD-28 (CC0 1.0). <strong>quartertone</strong>, nylon del pack 11573 de Freesound, editado por <strong>N. Brosowsky</strong> (CC BY 3.0). ScoreDAW usa subconjuntos convertidos y recortados.</td></tr>
+<tr><td>Amplificadores y respuestas de impulso</td><td><strong>TONE3000</strong>, motor Neural Amp Modeler WebAssembly, capturas y respuestas (MIT según los avisos del proyecto). Núcleo <strong>Neural Amp Modeler</strong> de <strong>Steven Atkinson</strong>.</td></tr>
+<tr><td>Grabaciones de piano</td><td><strong>Alexander Holm</strong>, Salamander Grand Piano V3 (CC BY 3.0). <strong>Jeff Learman</strong>, jRhodes3d (CC BY-NC-SA 4.0). <strong>Greg Sullivan</strong>, Wurlitzer EP200 con mapeo SFZ de <strong>kinwie</strong> (CC BY 3.0).</td></tr>
+<tr><td>Grabaciones de viento</td><td><strong>Versilian Studios, Samuel Gossner y colaboradores</strong>, saxo tenor VCSL y trompeta de VSCO-2 Community Edition interpretada por <strong>Simon Hutchinson</strong> (CC0 1.0).</td></tr>
+<tr><td>Exportación MP3</td><td><strong>lamejs</strong>, adaptación de LAME, con licencia LGPL-3.0 según los avisos del proyecto.</td></tr>
+<tr><td>Edición Windows</td><td><strong>Steinberg</strong>, VST 3 SDK (MIT). <strong>Comunidad free-audio</strong>, CLAP (MIT). <strong>Microsoft</strong>, WebView2 SDK (licencia del SDK).</td></tr>
+<tr><td>Paquetes opcionales</td><td>Integraciones con las bibliotecas de <strong>LiveReplica</strong> y <strong>Lemon-Studio</strong>. Los recursos de audio importados o convertidos desde bibliotecas externas mantienen las condiciones de sus autores.</td></tr>
+</tbody></table></div>
+<p>En la copia del proyecto, consulta <code>LICENSE</code>, los avisos <code>CREDITS.md</code> de Guitar Lab, Piano Lab y Wind Lab, y <code>desktop/licenses/THIRD_PARTY_NOTICES.md</code> para el detalle por componente.</p>
+<a class="top" href="#arriba">↑ Volver al inicio</a>
+</section>
+</main></div>
+</body>
+</html>

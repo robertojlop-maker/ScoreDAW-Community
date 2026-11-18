@@ -436,7 +436,12 @@
     Score: [['Score + Tab', 'F6', () => app.showView('scoretab')], ['Score only', 'F4', () => app.showView('score')], ['Tab only', 'F5', () => app.showView('tab')], null, ['Insert chord (Chord Builder)', '', () => SDAW.input.setMode('chords')]],
     Tools: [['✨ Auto Generate Track (melody / harmony / bass / drums)…', 'Ctrl+G', () => SDAW.autogen.open()], ['🎼 Auto Generate Full Song (genre, key, band)…', 'Ctrl+Shift+G', () => SDAW.songgen.open()], null, ['Song Builder (start with a style)…', '', () => app.showWelcome()], ['Load style groove…', '', () => app.showView('pattern')], null, ['Metronome', 'M', () => toggleMetronome()], ['Simple mode', '', () => app.setMode('simple')], ['Pro mode', '', () => app.setMode('pro')]],
     View: [['Pattern', 'F2', () => app.showView('pattern')], ['Piano Roll', 'F3', () => app.showView('pianoroll')], ['Mixer', 'F7', () => app.showView('mixer')], ['Generator (instrument panel)', 'F8', () => app.showView('instrument')], null, ['Library panel', 'Alt+1', () => SDAW.layout.toggle('libOpen')], ['Song / Arrange panel', 'Alt+2', () => SDAW.layout.toggle('arrOpen')], ['Input panel', 'Alt+3', () => SDAW.layout.toggle('inOpen')], ['Editor panel', 'Alt+4', () => SDAW.layout.toggle('edOpen')], ['Inspector panel', 'Alt+5', () => SDAW.layout.toggle('inspOpen')], ['Reset panel layout', 'Alt+0', () => SDAW.layout.reset()], null, ['Interface: Auto size', 'Ctrl+0', () => app.changeScale(0)], ['Interface: larger', 'Ctrl +', () => app.changeScale(1)], ['Interface: smaller', 'Ctrl −', () => app.changeScale(-1)]],
-    Help: [['Help & shortcuts', 'F1', () => app.showHelp()], ['About', '', () => SDAW.toast(CONFIG.app.name + ' ' + CONFIG.app.version + ' — preview build')]]
+    Help: [
+      ['User Manual (English)', '', () => app.openManual('en')],
+      ['Manual de usuario (Español)', '', () => app.openManual('es')],
+      ['Help & shortcuts', 'F1', () => app.showHelp()],
+      ['About', '', () => app.showAbout()]
+    ]
   };
   function buildMenus() {
     const bar = $('#menubar');
@@ -567,6 +572,31 @@
   };
 
   /* =================================================== HELP WINDOW ===== */
+  app.openManual = function (language) {
+    window.open(language === 'en' ? 'manual/en.html' : 'manual/index.html', '_blank', 'noopener');
+  };
+
+  app.showAbout = function () {
+    const close = () => back.remove();
+    const back = el('div', { class: 'modal-back', onmousedown: e => { if (e.target === back) close(); } }, [
+      el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'about-title' }, [
+        el('button', { class: 'close', 'aria-label': 'Close About', onclick: close }, '✕'),
+        el('h2', { id: 'about-title', style: { marginTop: 0 } }, 'About ' + CONFIG.app.name),
+        el('p', {}, ['Version ', el('strong', {}, CONFIG.app.version)]),
+        el('p', {}, 'Created 100% with AI using Claude (Anthropic) and ChatGPT (OpenAI), under Roberto’s direction.'),
+        el('h3', {}, 'Third-party credits'),
+        el('p', {}, 'Recordings from FreePats, Gestalt LUR, Karoryfer Samples, Jeff Learman, quartertone, N. Brosowsky, Alexander Holm, Greg Sullivan, kinwie and Versilian Studios.'),
+        el('p', {}, 'Amp modeling by TONE3000 and Steven Atkinson’s Neural Amp Modeler. MP3 export uses lamejs. The Windows edition integrates Steinberg VST3, CLAP from the free-audio community and Microsoft WebView2.'),
+        el('a', { href: 'manual/en.html#credits', target: '_blank', rel: 'noopener' }, 'View credits and licenses'),
+        el('div', { style: { display: 'flex', justifyContent: 'flex-end', marginTop: '16px' } }, [
+          el('button', { class: 'btn', onclick: close }, 'Close')
+        ])
+      ])
+    ]);
+    $('#modalRoot').appendChild(back);
+    back.querySelector('button').focus();
+  };
+
   app.showHelp = function () {
     const close = () => back.remove();
     const rows = (list) => el('table', {}, list.map(([k, v]) => el('tr', {}, [el('td', {}, k), el('td', {}, v)])));
@@ -574,6 +604,11 @@
       el('div', { class: 'modal help-modal' }, [
         el('button', { class: 'close', onclick: close }, '✕'),
         el('h2', { style: { marginTop: 0 } }, 'Help & Shortcuts'),
+        el('p', {}, [
+          el('a', { href: 'manual/en.html', target: '_blank', rel: 'noopener' }, 'User Manual (English)'),
+          ' · ',
+          el('a', { href: 'manual/index.html', target: '_blank', rel: 'noopener', lang: 'es', hreflang: 'es' }, 'Manual de usuario (Español)')
+        ]),
         el('p', { style: { color: 'var(--text-dim)' } }, 'One song, many views: a note written on the fretboard appears in the tab, the score, the piano roll and the arrange view at once. Move the mouse over any control — the help bar at the bottom explains it.'),
         el('div', { class: 'help-cols' }, [
           el('div', {}, [el('h3', {}, 'General'), rows([
