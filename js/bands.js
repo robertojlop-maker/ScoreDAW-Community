@@ -336,6 +336,9 @@
    *   riffs and the solos (84 of 109 songs), so both tracks share one "brown sound". The bass doubles the
    *   moving guitar riff in some bars (intros, verses), else it drives 8ths with walk-ups (root-root-4-5).
    * The riffs below are ORIGINAL, written with that vocabulary (bandriff notation: legends.js). */
+  /* Van Halen song types that share the hard-rock progressions */
+  const VH_ROCK = 'rocker boogie anthem pedal instrumental synth piano';
+  const VH_RIFF = 'rocker anthem pedal instrumental';
   band('Van Halen', {
     band: 'vanhalen',
     desc: 'Party hard rock with one guitar that plays riffs AND solos: open-string pedal riffs with inverted triads, walking 4th dyads, sus2 / add9 seconds, quartal chords, bass-line runs between the chords and harmonics; a showman singer with high backing harmonies, and solos with tap-pull-hammer tapping, legato, 4th double stops and whammy dives over just bass and drums. Also fast shuffle boogies and synth-driven anthems.',
@@ -346,22 +349,49 @@
       Standard: 'Intro:8 Verse:8 Pre-Chorus:4 Chorus:8 Verse:8 Pre-Chorus:4 Chorus:8 Solo:16 Chorus:8 Outro:4',
       Extended: 'Intro:8 Verse:8 Verse:8 Pre-Chorus:4 Chorus:8 Verse:8 Pre-Chorus:4 Chorus:8 Bridge:8 Solo:16 Chorus:8 Chorus:8 Outro:8'
     },
+    // Song types that play the band's hard-rock harmony (the riff progressions); the ballad, synth and piano
+    // types have their own lists below, the shuffle type ('boogie') shares the riff list.
     progs: [
-      P('I–I–IV–IV', 'major', 'verse chorus intro', 'I I IV IV', 'rocker boogie'), P('I–bVII–I–bVII', 'major', 'verse intro', 'I bVII I bVII', 'rocker boogie'),
-      P('I–IV–V–IV', 'major', 'verse chorus solo', 'I IV V IV', 'rocker boogie'), P('I–I–V–V', 'major', 'verse', 'I I V V', 'rocker boogie'),
-      P('I·bIII–IV (riff)', 'major', 'verse solo', 'I I-bIII IV IV', 'rocker'), P('Chorus: I–I–vi–vi', 'major', 'chorus', 'I I vi vi', 'rocker'),
-      P('Chorus: IV–V–I–I', 'major', 'chorus', 'IV V I I', 'rocker boogie'), P('Chorus: V–V–I–I', 'major', 'chorus', 'V V I I', 'rocker boogie'),
-      P('Chorus: bVII–IV–I–I', 'major', 'chorus', 'bVII IV I I', 'rocker'), P('Pre: vi–vi–IV–V', 'major', 'pre', 'vi vi IV V', 'rocker boogie'),
-      P('Pre: IV–IV–V–V', 'major', 'pre bridge', 'IV IV V V'), P('Bridge: bVI–bVII–I', 'major', 'bridge', 'bVI bVII I I'), P('Bridge: ii–ii–IV–V', 'major', 'bridge', 'ii ii IV V'),
+      /* ---------------------------------------------------------------- MAJOR (mixolydian rock) --- */
+      P('I–I–IV–IV', 'major', 'verse chorus intro solo', 'I I IV IV', VH_ROCK), P('I–bVII–I–bVII', 'major', 'verse intro solo', 'I bVII I bVII', VH_ROCK),
+      P('I–IV–V–IV', 'major', 'verse chorus solo', 'I IV V IV', VH_ROCK), P('I–I–V–V', 'major', 'verse pre', 'I I V V', VH_ROCK),
+      P('I·bIII–IV (riff)', 'major', 'verse solo intro', 'I I-bIII IV IV', VH_RIFF), P('Chorus: I–I–vi–vi', 'major', 'chorus', 'I I vi vi', VH_RIFF),
+      P('Chorus: IV–V–I–I', 'major', 'chorus', 'IV V I I', VH_ROCK), P('Chorus: V–V–I–I', 'major', 'chorus', 'V V I I', VH_ROCK),
+      P('Chorus: bVII–IV–I–I', 'major', 'chorus solo', 'bVII IV I I', VH_RIFF), P('Pre: vi–vi–IV–V', 'major', 'pre', 'vi vi IV V', VH_ROCK),
+      P('Pre: IV–IV–V–V', 'major', 'pre bridge', 'IV IV V V'), P('Bridge: bVI–bVII–I', 'major', 'bridge solo intro', 'bVI bVII I I'), P('Bridge: ii–ii–IV–V', 'major', 'bridge pre', 'ii ii IV V'),
       P('12-bar boogie', 'major', 'verse solo', 'I I I I IV IV I I V IV I V', 'boogie'),
-      P('Minor i–i·bIII (riff)', 'minor', 'verse intro solo', 'i i-bIII i i-bVII', 'rocker boogie'), P('Minor i–bVII–i–bVII', 'minor', 'verse chorus', 'i bVII i bVII', 'rocker boogie'),
-      P('Minor i–i–bVII–bVI', 'minor', 'verse solo', 'i i bVII bVI', 'rocker boogie'), P('Minor chorus: bVI–bVII–i', 'minor', 'chorus', 'bVI bVII i i', 'rocker boogie'),
-      P('Minor chorus: i–bIII–bVII–IV', 'minor', 'chorus solo', 'i bIII bVII IV', 'rocker boogie'), P('Minor pre: iv–iv–bVII–bVII', 'minor', 'pre bridge', 'iv iv bVII bVII'),
+      // pedal-point riffs: the chords move over the open tonic string
+      P('Pedal: I–IV/I–bVII/I–I', 'major', 'verse intro solo', 'I IV/I bVII/I I', VH_RIFF), P('Pedal: I–bVII/I–IV/I–bVII/I', 'major', 'intro verse', 'I bVII/I IV/I bVII/I', VH_RIFF),
+      P('Anthem: I–V–IV–IV', 'major', 'verse chorus intro solo', 'I V IV IV', VH_ROCK), P('Anthem chorus: I–V–IV–I', 'major', 'chorus', 'I V IV I', VH_ROCK),
+      P('Solo: I–bVII–IV–I', 'major', 'solo verse', 'I bVII IV I', VH_ROCK), P('Solo: I·IV–bVII·IV', 'major', 'solo intro', 'I-IV bVII-IV I-IV bVII-IV', VH_RIFF),
+      P('Intro: I·bVII–IV–I', 'major', 'intro', 'I-bVII IV I I', VH_RIFF), P('Intro: IV–bVII–I–I', 'major', 'intro solo', 'IV bVII I I', VH_ROCK),
+      P('Pre: ii–IV–V–V', 'major', 'pre bridge', 'ii IV V V'), P('Pre: bVI–bVII–V–V', 'major', 'pre bridge solo', 'bVI bVII V V', VH_ROCK),
+       P('Bridge: vi–V–IV–V', 'major', 'bridge pre', 'vi V IV V'),
+      P('Bridge: bIII–IV–bVII–I', 'major', 'bridge solo intro', 'bIII IV bVII I', VH_RIFF),
+      /* ---------------------------------------------------------------- MINOR (aeolian / phrygian) --- */
+      P('Minor i–i·bIII (riff)', 'minor', 'verse intro solo', 'i i-bIII i i-bVII', VH_RIFF), P('Minor i–bVII–i–bVII', 'minor', 'verse chorus intro', 'i bVII i bVII', VH_ROCK),
+      P('Minor i–i–bVII–bVI', 'minor', 'verse solo', 'i i bVII bVI', VH_ROCK), P('Minor chorus: bVI–bVII–i', 'minor', 'chorus intro bridge', 'bVI bVII i i', VH_ROCK),
+      P('Minor chorus: i–bIII–bVII–IV', 'minor', 'chorus solo', 'i bIII bVII IV', VH_ROCK), P('Minor pre: iv–iv–bVII–bVII', 'minor', 'pre bridge', 'iv iv bVII bVII'),
+      P('Minor i–i–bVI–bVII', 'minor', 'verse solo intro', 'i i bVI bVII', VH_ROCK), P('Minor i–iv–bVII–i', 'minor', 'verse solo', 'i iv bVII i', VH_ROCK),
+      P('Minor i–bVII–bVI–bVII', 'minor', 'verse chorus solo intro', 'i bVII bVI bVII', VH_ROCK), P('Minor riff: i–bIII·iv', 'minor', 'verse intro solo', 'i bIII-iv i bVII', VH_RIFF),
+      P('Minor chorus: bIII–bVII–iv–i', 'minor', 'chorus', 'bIII bVII iv i', VH_ROCK), P('Minor chorus: bVI–bIII–bVII–bVII', 'minor', 'chorus', 'bVI bIII bVII bVII', VH_ROCK),
+      P('Minor pre: bVI–bVI–bVII–bVII', 'minor', 'pre', 'bVI bVI bVII bVII'),
+       P('Minor pre: bVI–bVII–V–V', 'minor', 'pre bridge solo', 'bVI bVII V V'),
+      P('Minor bridge: iv–bVI–bVII–i', 'minor', 'bridge', 'iv bVI bVII i'),
+      /* ------------------------------------------------------------------ SYNTH ANTHEMS --- */
       P('Synth I–IV–V', 'major', 'verse intro solo', 'I IV V V', 'synth'), P('Synth I–V–IV–V', 'major', 'verse chorus', 'I V IV V', 'synth'),
-      P('Synth chorus: IV–V–I–I', 'major', 'chorus', 'IV V I I', 'synth'), P('Synth chorus: I–IV–I–V', 'major', 'chorus intro', 'I IV I V', 'synth'),
-      P('Synth chorus: vi–IV–V–V', 'major', 'chorus pre', 'vi IV V V', 'synth'),
-      P('Synth minor i–bVI–bVII–i', 'minor', 'verse chorus solo intro', 'i bVI bVII i', 'synth'), P('Synth minor chorus: bIII–bVII–i', 'minor', 'chorus', 'bIII bVII i i', 'synth')
-    ],
+      P('Synth chorus: IV–V–I–I', 'major', 'chorus', 'IV V I I', 'synth'), P('Synth chorus: I–IV–I–V', 'major', 'chorus intro', 'I IV I V', 'synth piano'),
+      P('Synth chorus: vi–IV–V–V', 'major', 'chorus pre', 'vi IV V V', 'synth piano ballad'), P('Synth pedal: I–IV/I–V/I–IV/I', 'major', 'intro verse', 'I IV/I V/I IV/I', 'synth'),
+      P('Synth minor i–bVI–bVII–i', 'minor', 'verse chorus solo intro', 'i bVI bVII i', 'synth piano'), P('Synth minor chorus: bIII–bVII–i', 'minor', 'chorus', 'bIII bVII i i', 'synth'),
+      /* ------------------------------------------------------------------ BALLADS / PIANO --- */
+      P('Ballad: I–V–vi–IV', 'major', 'verse chorus', 'I V vi IV', 'ballad piano'),
+      P('Ballad pre: vi–IV–ii–V', 'major', 'pre bridge', 'vi IV ii V', 'ballad piano'), P('Ballad: Isus2–IVadd9–vi–V', 'major', 'intro verse', 'Isus2 IVadd9 vi V', 'ballad'),
+      P('Piano: I–IV–I–bVII', 'major', 'verse chorus intro', 'I IV I bVII', 'piano'), P('Piano: I–bVII–IV–IV', 'major', 'verse intro solo', 'I bVII IV IV', 'piano'),
+      P('Minor ballad: i–bVI–bIII–bVII', 'minor', 'verse chorus', 'i bVI bIII bVII', 'ballad piano'),
+      P('Minor ballad intro: i–bVII–bVI–bVII', 'minor', 'intro pre', 'i bVII bVI bVII', 'ballad piano'),
+      P('Ballad: I–vi–IV–V', 'major', 'verse chorus solo', 'I vi IV V', 'ballad'), P('Ballad chorus: vi–IV–I–V', 'major', 'chorus solo', 'vi IV I V', 'ballad synth'),
+      P('Ballad: I–IV–vi–V', 'major', 'verse intro solo', 'I IV vi V', 'ballad'),
+       P('Minor ballad chorus: bVI–bIII–bVII–i', 'minor', 'chorus solo', 'bVI bIII bVII i', 'ballad'),],
     tracks: [
       T('drums', 'Drums', 'drums', 'Acoustic Kit', { kit: 'set', vol: 0.9, pat: {
         intro: { kick: 'X.......X.x.....', snare: '....X.......X...', hho: 'x...x...x...x...' },
@@ -428,7 +458,7 @@
     leadPlan: {},
     melody: { heroes: ['vanhalen'], scales: ROCK_SCALES },
     types: {
-      rocker: { n: 'Riff rocker — triads over a pedal, tapping solo', w: 4,
+      rocker: { n: 'Riff rocker — triads over a pedal, tapping solo', w: 6,
         d: 'One guitar, one riff: triads and sus4 chords over a muted pedal note, open hi-hat in the verse, high harmonies in the chorus, and a solo over bass and drums alone.' },
       boogie: { n: 'Fast shuffle boogie — swung 8ths, double-time feel', w: 2,
         d: 'Swung and fast: boogie riff, shuffle on the ride, 12-bar verses when the idea picks them, a wild solo.',
@@ -459,7 +489,40 @@
             chorus: { kick: 'X.....x.X.x.....', snare: '....X.......X...', hho: 'X...X...X...X...' },
             solo: { kick: 'X.x.....X.x...x.', snare: '....X.......X...', ride: 'X.x.X.x.X.x.X.x.' },
             fill: { snare: '........X.X.XXXX', tom1: '................', tom2: '..............XX', kick: 'X.......X.......' } } },
-          lead: { in: IN('intro:0 verse:0 pre:0 chorus:.5 bridge:.5 solo:1 outro:.5') } } }
+          lead: { in: IN('intro:0 verse:0 pre:0 chorus:.5 bridge:.5 solo:1 outro:.5') } } },
+      /* ---- more song types, all with the same guitarist, amp and vocabulary ---- */
+      anthem: { n: 'Party anthem — big open chords, shout-along chorus', w: 3,
+        d: 'Fast and bright: wide open chords on the beat, a riff that answers the singer, a gang-shout hook in the chorus and a short burning solo.',
+        set: { tempo: [132, 152, 142], minor: 0.15, keys: { major: ['E', 'A', 'D', 'G'], minor: ['A', 'E'] } },
+        tracks: {
+          drums: { pat: {
+            verse: { kick: 'X.......X.......', snare: '....X.......X...', hho: 'x.x.x.x.x.x.x.x.' },
+            chorus: { kick: 'X...X...X...X...', snare: '....X.......X...', ride: 'X.x.X.x.X.x.X.x.' } } },
+          rhythm: { riffs: { chorus: ['0:C:2a 2:C:2 4:C:4 8:C:2a 10:C:2 12:C:4', '0:O:6a 6:O:2 8:O:6a 14:C:2', '0:C:4a 4:C:4 8:C:2 10:C:2 12:C:4'] } } } },
+      pedal: { n: 'Pedal burner — chords over a ringing open string', w: 2,
+        d: 'Fast and driving: the open low string rings under moving chords (bVII and IV over the tonic), quick chord stabs, flanged riffs and a solo full of tapping.',
+        set: { tempo: [138, 172, 150], minor: 0.35 },
+        tracks: { rhythm: { play: 'vh' }, bass: { play: '8ths' } } },
+      ballad: { n: 'Power ballad — synth pad, clean arpeggios, big chorus', w: 1,
+        d: 'Slow and wide: a synth pad and a clean arpeggiated guitar in the verses, the distortion and drums open the chorus, a singing solo with long bends and harmonics.',
+        set: { tempo: [72, 96, 84], minor: 0.25, keys: { major: ['D', 'A', 'E', 'G', 'C'], minor: ['A', 'E', 'B'] } },
+        tracks: {
+          synth: { on: true, play: 'pad', inst: 'Warm Pad' },
+          rhythm: { play: 'arp', vol: 0.6 },
+          drums: { in: IN('intro:0 verse:.5'), pat: {
+            verse: { kick: 'X.........x.....', snare: '........X.......', hhc: 'x...x...x...x...' },
+            chorus: { kick: 'X.......X.x.....', snare: '....X.......X...', ride: 'x.x.x.x.x.x.x.x.' } } },
+          lead: { in: IN('intro:.5 verse:0 pre:0 chorus:0 bridge:.5 solo:1 outro:1') } } },
+      piano: { n: 'Piano rocker — piano riff in the verses, guitar in the chorus', w: 1,
+        d: 'A grand piano plays the riff and the verses; the guitar joins in the pre-chorus with power chords, and the solo flies over piano, bass and drums.',
+        set: { tempo: [110, 132, 120], minor: 0.2 },
+        tracks: {
+          synth: { on: true, inst: 'Grand Piano', play: 'chords', fx: 'Room' },
+          rhythm: { in: IN('intro:0 verse:0 pre:1 chorus:1 bridge:.5 solo:0 outro:1') } } },
+      instrumental: { n: 'Guitar instrumental — themes, tapping and harmonics, no singer', w: 1,
+        d: 'No singer: the lead guitar plays the themes and the solos over the riff guitar, bass and drums — tapping, harmonic runs, tremolo runs and dive bombs.',
+        set: { vocal: null, tempo: [120, 160, 138], minor: 0.45 },
+        tracks: { lead: { in: IN('intro:1 verse:1 pre:1 chorus:1 bridge:1 solo:1 outro:1') }, rhythm: { in: IN('solo:.5') } } }
     }
   });
 

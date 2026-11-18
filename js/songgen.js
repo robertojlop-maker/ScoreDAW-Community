@@ -188,11 +188,12 @@
    * melody a little higher, so the lead line stands out of the band. Only new songs: a saved
    * project keeps the volumes it was saved with.
    */
-  SG.MIX = { bass: 0.86, lead: 1.2, vocal: 1.12, max: 1 };      // the fader is quadratic: 0.86 = −2.6 dB, 1.2 = +3.2 dB, 1.12 = +2 dB
+  // the fader is quadratic: 0.86 = −2.6 dB, 1.2 = +3.2 dB. `vocal` is the fader of the lead singer itself (70 %).
+  SG.MIX = { bass: 0.86, lead: 1.2, vocal: 0.70, max: 1 };
   SG.mixVolume = function (spec) {
     let v = spec.vol || 0.75;
     if (spec.role === 'bass') v *= SG.MIX.bass;
-    else if (spec.role === 'vocal') v *= SG.MIX.vocal;
+    else if (spec.role === 'vocal') v = SG.MIX.vocal;
     else if (spec.lead) v *= SG.MIX.lead;
     return Math.min(SG.MIX.max, Math.round(v * 100) / 100);
   };
@@ -315,8 +316,15 @@
     if (!out.solo) out.solo = out.chorus;
     if (!out.pre) out.pre = GENERIC[mode].pre;
     if (!out.bridge) out.bridge = SG.progsFor(style, 'chorus', mode).filter(p => p.c !== out.chorus).map(p => p.c)[0] || GENERIC[mode].bridge;
-    const intro = SG.progsFor(style, 'intro', mode).find(p => !p.use.includes('verse') && !p.use.includes('chorus') && !p.use.includes('solo'));
-    out.intro = intro ? intro.c : out.chorus;
+    // intro: one of the progressions tagged for intros (the intro-only turnarounds first), chosen with the
+    // idea, so a style with many intro progressions does not open every song the same way
+    if (chosen && chosen.intro && chosen.intro !== 'auto') out.intro = chosen.intro;
+    else {
+      const intros = SG.progsFor(style, 'intro', mode).filter(p => fits(p, 'intro'));
+      const only = intros.filter(p => !p.use.includes('verse') && !p.use.includes('chorus') && !p.use.includes('solo'));
+      const list = only.length && R.chance(0.6) ? only : intros;
+      out.intro = list.length ? R.pick(list).c : out.chorus;
+    }
     const outro = SG.progsFor(style, 'outro', mode)[0];
     if (outro) out.outro = outro.c;
     else { const toks = out.chorus.split(' '); toks[toks.length - 1] = mode === 'minor' ? 'i' : 'I'; out.outro = toks.join(' '); }
@@ -806,6 +814,10 @@
     if (reference && (!st.band || st.reference)) st = SG.applyRef(st, reference, opts.mode, opts.seed || 1);
     return st;
   };
+  /** guitarists who made instrumental records: their styles start without a singer */
+  SG.INSTRUMENTAL_HEROES = ['malmsteen', 'satriani', 'vai'];
+  /** the lead plan of an instrumental: the guitar sings the themes, riffs before the chorus, solos in the solo */
+  SG.INSTRUMENTAL_PLAN = { intro: 'melody', verse: 'melody', pre: 'riff', chorus: 'melody', bridge: 'melody', solo: 'solo', outro: 'melody' };
   SG.defaults = function (genre, seed, songType) {
     seed = seed || SG.newSeed();
     const base = SDAW.STYLES[genre] || SDAW.STYLES.Pop;
@@ -814,9 +826,13 @@
       const mode = st.mode || 'major', tracks = {};
       st.tracks.forEach(t => { tracks[t.id] = { on: t.on !== false, inst: t.inst, play: t.play || null, fx: t.fx || 'Room' }; });
       const lead = st.tracks.find(t => t.lead) || {};
+      // instrumental guitarists (Malmsteen, Satriani, Vai): no singer by default — the lead guitar plays the
+      // melody of every section (a singer can still be chosen in the panel)
+      const instrumental = SG.INSTRUMENTAL_HEROES.includes(st.melody?.heroes?.[0]);
       return { genre, songType: songType && base.types && base.types[songType] ? songType : 'auto', key: SDAW.noteIndex(st.key[mode]), mode, tempo: st.tempo[2], structure: 'Standard', complexity: 1, density: 1, seed, progs: {}, tracks,
-        vocals: st.vocal ? 'singer' : 'instrumental', voice: (st.vocal && st.vocal.gender) || 'auto', choir: st.vocal && st.vocal.voices !== undefined ? (st.vocal.voices ? String(st.vocal.voices) : 'none') : 'auto',
-        leadPlan: Object.assign({}, st.leadPlan || {}),
+        vocals: st.vocal && !instrumental ? 'singer' : 'instrumental', voice: (st.vocal && st.vocal.gender) || 'auto',
+        choir: instrumental ? 'none' : st.vocal && st.vocal.voices !== undefined ? (st.vocal.voices ? String(st.vocal.voices) : 'none') : 'auto',
+        leadPlan: Object.assign({}, instrumental ? SG.INSTRUMENTAL_PLAN : st.leadPlan || {}),
         melody: Object.assign({ complex: false, fast: false, triplets: false, modes: false, slides: false, harmonics: false, bends: false, vibrato: true, hero: st.melody?.heroes?.[0] || 'auto' }, lead.mel || {}) };
     }
     const mode = st.mode || 'major';
@@ -879,7 +895,8 @@
     o.ending = 'auto';
     return o;
   };
-  SG.genrePreset = function (genre, seed, type) {
+  SG.genrePreset = function (genre, seed, type) { return SG.startDefaults(genrePresetOf(genre, seed, type)); };
+  function genrePresetOf(genre, seed, type) {
     const base = SDAW.STYLES[genre];
     const o = SG.defaults(genre, seed, type || (base.types && Object.keys(base.types)[0]));
     const hero = o.melody.hero;
@@ -898,13 +915,32 @@
     }
     o.extras = []; o.ending = 'auto';
     return o;
-  };
+  }
 
   /**
    * Defaults with a key and a tempo chosen by the seed, inside what suits the genre:
    * the key moves by a 4th, 5th or whole tone from the genre's usual key (guitar-friendly
    * keys stay guitar-friendly), the tempo stays inside the tempo range of the genre.
    */
+  /** the start options of the welcome style (CONFIG.ui.welcomeDefault) applied to a preset of that style */
+  SG.startDefaults = function (o) {
+    const W = CONFIG.ui.welcomeDefault;
+    if (!W || !o || o.genre !== W.style || !W.options) return o;
+    const x = W.options;
+    if (x.leadPlan && SG.LEAD_PRESETS[x.leadPlan]) o.leadPlan = Object.assign({}, SG.LEAD_PRESETS[x.leadPlan].plan);
+    if (x.melody) o.melody = Object.assign({}, o.melody, x.melody);
+    if (x.vocals) o.vocals = x.vocals;
+    // the intro changes with the idea (seed), mostly a riff (weights in CONFIG.ui.welcomeDefault.options.intro)
+    if (x.intro) {
+      const r = U().makeRand(U().hash('intro|' + (o.seed || 1))).next();
+      const total = Object.values(x.intro).reduce((a, b) => a + b, 0) || 1;
+      let acc = 0;
+      const pick = Object.keys(x.intro).find(k => (acc += x.intro[k] / total) > r) || Object.keys(x.intro)[0];
+      o.leadPlan = Object.assign({}, o.leadPlan, { intro: pick });
+    }
+    return o;
+  };
+
   SG.variedDefaults = function (genre, seed, songType) {
     const o = SG.defaults(genre, seed, songType), st = SG.styleOf(o);
     const R = U().makeRand(o.seed ^ 0x6B3D);
@@ -1065,6 +1101,33 @@
    * at least two different songs exist in the library, so the song sounds like the band without
    * copying one of its songs. Everything else (form, instruments, sounds) stays the genre's.
    */
+  /* ------------------------------------------ STYLE GROUPS (pickers) --- *
+   * The genres, the bands and the guitarists, each list in alphabetical order. Used by the
+   * Welcome screen (Genre · Band · Guitarist) and by the genre grid of the Full Song panel.   */
+  SG.BAND_FAMILY = '🎸 Bands';
+  SG.GUITARISTS = ['Albert King', 'B.B. King', 'Biréli Lagrène', 'Chuck Berry', 'Django Reinhardt', 'Eric Clapton', 'Eric Johnson',
+    'Joe Satriani', 'Paco de Lucía', 'Paul Gilbert', 'Robert Johnson', 'Santana', 'Steve Vai', 'Stevie Ray Vaughan', 'Yngwie Malmsteen'];
+  /** 'genre' | 'band' | 'guitarist' */
+  SG.groupOfStyle = function (name) {
+    const st = SDAW.STYLES[name];
+    if (!st || st.family !== SG.BAND_FAMILY) return 'genre';
+    return SG.GUITARISTS.includes(name) ? 'guitarist' : 'band';
+  };
+  /** { genre: [[family, [names…]], …], band: [names…], guitarist: [names…] } — all alphabetical */
+  SG.styleGroups = function () {
+    const fams = {}, band = [], guitarist = [];
+    Object.keys(SDAW.STYLES).forEach(name => {
+      const g = SG.groupOfStyle(name);
+      if (g === 'band') band.push(name);
+      else if (g === 'guitarist') guitarist.push(name);
+      else (fams[SDAW.STYLES[name].family || 'Other'] = fams[SDAW.STYLES[name].family || 'Other'] || []).push(name);
+    });
+    return {
+      genre: Object.keys(fams).sort(SDAW.byName).map(f => [f, fams[f].sort(SDAW.byName)]),
+      band: band.sort(SDAW.byName), guitarist: guitarist.sort(SDAW.byName)
+    };
+  };
+
   SG.refArtists = function (genre) {
     const d = SDAW.styleData; if (!d) return [];
     return Object.keys(d.artists).map(id => { const a = d.artists[id]; return { id, name: a.name, fits: a.genres.includes(genre), songs: a.songs }; })
@@ -1120,7 +1183,7 @@
   };
 
   /** Extend the written cadence inside one pattern so playback merges the tied notes. */
-  function sustainEnding(song, specs) {
+  function sustainEnding(song, specs, BAR = 16) {
     const end = song.bars * BAR;
     const starting = new Map(song.patterns.map(p => [p.id, p]));
     const roles = new Map(specs.map(spec => [spec.id, spec.role]));
@@ -1163,7 +1226,7 @@
     }
     let st = SG.styleOf(opts);
     // extra instruments of the panel join the band of the genre (only for this song)
-    const extras = (opts.extras || []).map((x, i) => SG.extraSpec(x, st, i)).filter(Boolean);
+    const extras = (st.classical ? [] : opts.extras || []).map((x, i) => SG.extraSpec(x, st, i)).filter(Boolean);
     const trackOpts = Object.assign({}, opts.tracks);
     if (extras.length) {
       st = Object.assign({}, st, { tracks: st.tracks.concat(extras) });
@@ -1173,7 +1236,9 @@
     const song = s.newSong();
     if (SDAW.legends) SDAW.legends.lastHero = null;
     const keyRoot = opts.key, mode = opts.mode;
-    song.title = opts.genre + ' Song';
+    song.title = st.classical ? st.typeName.split(' · ')[1] : opts.genre + ' Song';
+    if (st.classical) song.timeSig = SDAW.classical.settings(opts, st).meter.split('/').map(Number);
+    const barLength = st.classical ? SDAW.barTicks(song) : BAR;
     song.style = opts.genre;
     // the recipe of the song: the same options + seed rebuild the same composition ("Reuse this song's idea")
     song.gen = { by: 'songgen', v: 1, seed: opts.seed || 1, opts: SDAW.deepCopy(opts) };
@@ -1181,7 +1246,7 @@
     song.key = SDAW.NOTE_NAMES[keyRoot]; song.scale = mode; song.keyFixed = true;
     song.swing = st.swing || 0; song.swingGrid = st.grid || 8;
     // 1. form
-    const plan = SG.vocalPlan(opts);
+    const plan = st.classical ? null : SG.vocalPlan(opts);
     let secs = SG.parseStructure(st.structures[opts.structure] || st.structures.Standard);
     if (plan) secs = SG.vocalForm(secs);
     song.vocals = plan ? { gender: plan.gender, choir: plan.choirMode, voices: plan.voices } : null;
@@ -1195,7 +1260,7 @@
     const flats = SG.prefersFlats(keyRoot, mode);
     song.chords = [];
     let last = null;
-    const ending = SG.endingFor(opts, st), lastSec = secs[secs.length - 1];
+    const ending = st.classical ? null : SG.endingFor(opts, st), lastSec = secs[secs.length - 1];
     if (ending) song.gen.ending = ending.n;
     secs.forEach(x => {
       const toks = progs[SG.groupOf(x.type)].split(/\s+/).filter(Boolean);
@@ -1213,7 +1278,7 @@
         }
         tok.split('-').forEach((h, hi, arr) => {
           const name = SG.romanToName(h, keyRoot, flats);
-          const tick = (x.start + b) * BAR + (arr.length > 1 ? hi * 8 : 0);
+          const tick = (x.start + b) * barLength + (arr.length > 1 ? hi * barLength / 2 : 0);
           if (name !== last) { song.chords.push({ tick, name }); last = name; }
         });
       }
@@ -1231,6 +1296,12 @@
           specs.push(sp);
           song.tracks.push(SG.makeTrackFor(sp, sp.inst));
         });
+      }
+      if (st.classical) {
+        SDAW.classical.arrange(song, opts, st, secs);
+        sustainEnding(song, specs, barLength);
+        SDAW.classical.phrase(song);
+        return song;
       }
       const vox = plan ? song.tracks.find(x => x.styleTrack === 'vox') : null;
       const order = ['drums', 'bass', 'harmony', 'strum', 'arp', 'vocal', 'choir', 'melody', 'horns', 'counter', 'horn2'];
@@ -1263,6 +1334,8 @@
     s.beginEdit();
     // Use the same transport reset as opening a project (loop, pattern mode and pending playback).
     if (SDAW.app?.loadSong) SDAW.app.loadSong(song, true); else s.load(song, true);
+    // the new song opens on its Lead Guitar (or melody / piano / drums) with the matching editor tab
+    if (SDAW.app?.selectDefaultTrack) SDAW.app.selectDefaultTrack();
     const v = song.vocals, CH = { harmony: 'harmonies', oohs: 'oohs', call: 'coro (call & response)', hook: 'gang hook' };
     const vx = v ? ' · ' + (v.gender === 'female' ? 'female' : 'male') + ' singer' + (v.voices ? ' + ' + v.voices + '-voice ' + CH[v.choir] : '') : '';
     const hero = SDAW.legends && SDAW.legends.lastHero ? ' · lead guitar in the style of ' + SDAW.legends.lastHero : '';
@@ -1280,16 +1353,21 @@
     let o = init.genre && SDAW.STYLES[init.genre] ? SG.genrePreset(init.genre)
       : SG.last && SDAW.STYLES[SG.last.genre] ? SDAW.deepCopy(SG.last) : SG.genrePreset(SDAW.store.song.style && SDAW.STYLES[SDAW.store.song.style] ? SDAW.store.song.style : 'Salsa');
     o.seed = SG.newSeed();
+    if (init.genre) o = SG.startDefaults(o);   // the welcome style: its start options with this new idea
     if (!o.leadPlan) o.leadPlan = {};
     if (!o.extras) o.extras = [];
     if (!o.ending) o.ending = 'auto';
     const songGen = SDAW.store.song.gen && SDAW.store.song.gen.by === 'songgen' && SDAW.store.song.gen.opts && SDAW.STYLES[SDAW.store.song.gen.opts.genre] ? SDAW.store.song.gen : null;
     const body = el('div', { class: 'sg-body' });
     const close = () => back.remove();
-    const families = {};
-    Object.keys(SDAW.STYLES).forEach(g => { const f = SDAW.STYLES[g].family; (families[f] = families[f] || []).push(g); });
+    // style picker (like the Welcome screen): Genre · Band · Guitarist tabs + one alphabetical dropdown
+    const styleGroups = SG.styleGroups();
+    const PICK_KINDS = [['genre', 'Genre'], ['band', 'Band'], ['guitarist', 'Guitarist']];
+    let pickKind = SG.groupOfStyle(o.genre);
+    let leadOpen = false;          // "Lead options" block (closed by default)
 
-    function render() {
+    function render() { renderPanel(); SDAW.sortSelects(body); }
+    function renderPanel() {
       if (o.ref && !(SDAW.styleData && SDAW.styleData.artists[o.ref])) o.ref = '';
       const base = SDAW.STYLES[o.genre];
       if (base.band) o.ref = '';
@@ -1297,29 +1375,40 @@
       body.innerHTML = '';
       /* ---- column 1: genre, key, form ---- */
       const c1 = el('div', { class: 'sg-col' });
-      c1.appendChild(el('div', { class: 'ag-sub' }, 'Genre'));
-      Object.keys(families).forEach(f => {
-        c1.appendChild(el('div', { class: 'sg-fam' }, f));
-        c1.appendChild(el('div', { class: 'sg-genres' }, families[f].map(g => el('button', { class: 'sg-genre' + (g === o.genre ? ' active' : ''), onclick: () => {
-          o = SG.genrePreset(g, o.seed);
-          render(); } }, g))));
-      });
+      const inGroup = SG.groupOfStyle(o.genre) === pickKind;
+      const styleSel = el('select', { class: 'sg-style', 'aria-label': 'Style', onchange: e => {
+        if (!e.target.value) return;
+        o = SG.genrePreset(e.target.value, o.seed);
+        render(); } },
+        (inGroup ? [] : [el('option', { value: '', selected: true }, { genre: 'Choose a genre…', band: 'Choose a band…', guitarist: 'Choose a guitarist…' }[pickKind])])
+          .concat(pickKind === 'genre'
+            ? styleGroups.genre.map(([fam, names]) => el('optgroup', { label: fam }, names.map(g => el('option', { value: g, selected: g === o.genre ? true : null }, g))))
+            : styleGroups[pickKind].map(g => el('option', { value: g, selected: g === o.genre ? true : null }, g))));
+      c1.appendChild(el('div', { class: 'ag-sub' }, 'Style'));
+      c1.appendChild(el('div', { class: 'sg-pick' }, [
+        el('div', { class: 'sg-kinds', role: 'tablist' }, PICK_KINDS.map(([k, l]) => el('button', {
+          class: 'sg-kind' + (k === pickKind ? ' active' : ''), role: 'tab', 'aria-selected': k === pickKind ? 'true' : 'false',
+          onclick: () => { pickKind = k; render(); } }, l))),
+        styleSel
+      ]));
       c1.appendChild(el('div', { class: 'sg-desc' }, st.desc));
       // reference artist: the band of the genre plays like a band of the reference library (styledata.js)
       // a band profile (bands.js): its kinds of song — each brings its own line-up, tempo, key, form and progressions
       if (base.types) {
         const cur = o.songType && base.types[o.songType] ? o.songType : 'auto';
-        c1.appendChild(el('div', { class: 'ag-sub' }, '🎤 Kind of song'));
+        c1.appendChild(el('div', { class: 'ag-sub' }, st.classical ? 'Classical style' : '🎤 Kind of song'));
         c1.appendChild(el('select', { class: 'sg-ref', onchange: e => {
           const v = e.target.value;
-          o = SG.genrePreset(o.genre, o.seed, v === 'auto' ? SG.typeOf(base, { seed: o.seed }) : v);
+          const next = SG.genrePreset(o.genre, o.seed, v === 'auto' ? SG.typeOf(base, { seed: o.seed }) : v);
+          if (st.classical) Object.assign(next, { tracks: o.tracks, structure: o.structure });
+          o = next;
           render(); } },
-          [el('option', { value: 'auto', selected: cur === 'auto' ? true : null }, 'Pick a kind for this idea')].concat(Object.keys(base.types).map(id => el('option', { value: id, selected: cur === id ? true : null }, base.types[id].n)))));
+          (st.classical ? [] : [el('option', { value: 'auto', selected: cur === 'auto' ? true : null }, 'Pick a kind for this idea')]).concat(Object.keys(base.types).map(id => el('option', { value: id, selected: cur === id ? true : null }, base.types[id].n)))));
         c1.appendChild(el('div', { class: 'st-note sg-refnote' }, (cur === 'auto' ? 'This idea: ' + st.typeName + '. With Auto, the line-up, tempo, key and mode come with the kind of song the idea picks (your changes below apply when you choose a kind). ' : '') + (base.types[st.type].d || '')));
       }
-      const refs = base.band ? [] : SG.refArtists(o.genre);
+      const refs = base.band || st.classical ? [] : SG.refArtists(o.genre);
       if (refs.length) {
-        c1.appendChild(el('div', { class: 'ag-sub' }, '🎯 Reference artist'));
+        c1.appendChild(el('div', { class: 'ag-sub', 'data-help': 'Pick a band (★ = plays this genre) and the drums, bass, rhythm guitar, progressions and lead follow how that band really plays — learned from your Guitar Pro library.' }, '🎯 Reference artist'));
         c1.appendChild(el('select', { class: 'sg-ref', onchange: e => {
           const ref = e.target.value, ra = SDAW.styleData.artists[ref];
           o = ra ? SG.artistPreset(o, ra.hero) : SG.genrePreset(o.genre, o.seed);
@@ -1335,111 +1424,120 @@
           const tun = Object.keys(ra.tuning)[0] || 'E standard';
           c1.appendChild(el('div', { class: 'st-note sg-refnote' }, 'Learned from ' + ra.songs + ' songs: ' + ra.tempo[0] + '–' + ra.tempo[1] + ' BPM (usual ' + ra.tempo[2] + '), ' + Math.round(ra.minor * 100) + '% in minor, tuning ' + tun +
             '. Lead: ' + ra.lead.notesPerBar + ' notes per bar, ' + tech + (ra.lead.triplets >= 0.15 ? ', many triplets' : '') + '. Drums, bass, rhythm guitar and the progressions (★ in the next column) follow the band; the lead plays ' + (SDAW.legends && SDAW.legends.HEROES[ra.hero] ? SDAW.legends.HEROES[ra.hero].name : 'the genre lead') + '. Patterns the band plays in several songs — never a copy of one song.'));
-        } else c1.appendChild(el('div', { class: 'st-note sg-refnote' }, 'Pick a band (★ = plays this genre) and the drums, bass, rhythm guitar, progressions and lead follow how that band really plays — learned from your Guitar Pro library.'));
+        }
       }
       c1.appendChild(el('div', { class: 'ag-sub' }, 'Key, tempo & form'));
       c1.appendChild(row('Key', el('div', { class: 'sg-inline' }, [
-        el('select', { onchange: e => { o.key = +e.target.value; render(); } }, SDAW.NOTE_NAMES.map((n, i) => el('option', { value: i, selected: i === o.key ? true : null }, SG.prefersFlats(i, o.mode) ? SDAW.FLAT_NAMES[i] : n))),
-        el('select', { onchange: e => { o.mode = e.target.value; o.progs = {}; render(); } }, [['major', 'Major'], ['minor', 'Minor']].map(([v, l]) => el('option', { value: v, selected: o.mode === v ? true : null }, l)))
+        el('select', { 'data-order': 'keep', onchange: e => { o.key = +e.target.value; render(); } }, SDAW.NOTE_NAMES.map((n, i) => el('option', { value: i, selected: i === o.key ? true : null }, SG.prefersFlats(i, o.mode) ? SDAW.FLAT_NAMES[i] : n))),
+        el('select', { 'data-order': 'keep', onchange: e => { o.mode = e.target.value; o.progs = {}; render(); } }, [['major', 'Major'], ['minor', 'Minor']].map(([v, l]) => el('option', { value: v, selected: o.mode === v ? true : null }, l)))
       ])));
       c1.appendChild(row('Tempo', el('div', { class: 'sg-inline' }, [el('input', { type: 'number', min: 40, max: 240, value: o.tempo, style: { width: '80px' }, onchange: e => { o.tempo = +e.target.value || st.tempo[2]; } }), el('small', {}, st.tempo[0] + '–' + st.tempo[1] + ' BPM' + (st.swing ? ' · swing ' + Math.round(st.swing * 100) + '%' : ''))])));
-      c1.appendChild(row('Form', el('select', { onchange: e => { o.structure = e.target.value; render(); } }, Object.keys(st.structures).map(k => el('option', { value: k, selected: o.structure === k ? true : null }, k)))));
+      c1.appendChild(row('Form', el('select', { 'data-order': 'keep', onchange: e => { o.structure = e.target.value; render(); } }, Object.keys(st.structures).map(k => el('option', { value: k, selected: o.structure === k ? true : null }, k)))));
       const secs = SG.parseStructure(st.structures[o.structure]);
       c1.appendChild(el('div', { class: 'sg-form' }, secs.map(x => el('span', { style: { '--sc': SDAW.autogen.CONFIG.sectionColors[x.type] } }, x.name + ' ' + x.length))));
       // ending: the genre's own, the plain tonic, or one of the classic jazz endings
       const endList = SG.JAZZ_ENDINGS[o.mode === 'minor' ? 'minor' : 'major'];
       if (o.ending !== 'auto' && o.ending !== 'tonic' && o.ending !== 'jazz' && !endList.some(e => e.id === o.ending)) o.ending = 'auto';
-      c1.appendChild(row('Ending', el('select', { onchange: e => { o.ending = e.target.value; render(); } }, [
+      if (!st.classical) c1.appendChild(row('Ending', el('select', { onchange: e => { o.ending = e.target.value; render(); } }, [
         ['auto', st.ending === 'jazz' ? 'Auto — a big jazz ending (changes with 🎲)' : 'Auto — on the tonic (the genre\'s way)'], ['tonic', 'Simple — last chord on the tonic'], ['jazz', 'Jazz ending — any (changes with 🎲)']]
         .concat(endList.map(e => [e.id, '🎷 ' + e.n])).map(([v, l]) => el('option', { value: v, selected: o.ending === v ? true : null }, l)))));
       const endSel = endList.find(e => e.id === o.ending);
       if (endSel) c1.appendChild(el('div', { class: 'sg-chords' }, endSel.bars.slice(-secs[secs.length - 1].length).map(t => el('span', {}, t.split('-').map(h => SG.romanToName(h, o.key, SG.prefersFlats(o.key, o.mode))).join(' · ')))));
-      // vocals (every genre but Jazz)
-      const canSing = SDAW.vocals && SDAW.vocals.supports(o.genre);
-      if (!o.vocals) Object.assign(o, { vocals: 'instrumental', voice: 'auto', choir: 'auto' });
-      c1.appendChild(el('div', { class: 'ag-sub' }, 'Vocals'));
-      if (!canSing) c1.appendChild(el('div', { class: 'st-note', style: { marginTop: 0 } }, o.genre + ' is generated instrumental: the lead instruments carry the melody.'));
-      else {
-        c1.appendChild(row('Song', el('select', { onchange: e => { o.vocals = e.target.value; render(); } }, [['instrumental', 'Instrumental (the lead plays the melody)'], ['singer', 'With singer (+ backing vocals)']].map(([v, l]) => el('option', { value: v, selected: o.vocals === v ? true : null }, l)))));
-        if (o.vocals === 'singer') {
-          c1.appendChild(row('Voice', el('select', { onchange: e => { o.voice = e.target.value; } }, [['auto', 'Auto (changes with the idea)'], ['male', 'Male'], ['female', 'Female']].map(([v, l]) => el('option', { value: v, selected: o.voice === v ? true : null }, l)))));
-          c1.appendChild(row('Backing', el('select', { onchange: e => { o.choir = e.target.value; } }, [['auto', 'Auto (2–3 voices, style of the genre)'], ['2', '2 voices'], ['3', '3 voices'], ['none', 'No backing vocals']].map(([v, l]) => el('option', { value: v, selected: String(o.choir) === v ? true : null }, l)))));
-          c1.appendChild(el('div', { class: 'st-note', style: { marginTop: 0 } }, 'The singer takes the melody; the lead guitar / horns answer between the phrases and get a solo. The arrangement changes with every 🎲 idea.'));
+      if (!st.classical) {
+        // vocals (every genre but Jazz)
+        const canSing = SDAW.vocals && SDAW.vocals.supports(o.genre);
+        if (!o.vocals) Object.assign(o, { vocals: 'instrumental', voice: 'auto', choir: 'auto' });
+        c1.appendChild(el('div', { class: 'ag-sub', 'data-help': 'With a singer, the singer takes the melody; the lead guitar / horns answer between the phrases and get a solo. The arrangement changes with every 🎲 idea.' }, 'Vocals'));
+        if (!canSing) c1.appendChild(el('div', { class: 'st-note', style: { marginTop: 0 } }, o.genre + ' is generated instrumental: the lead instruments carry the melody.'));
+        else {
+          c1.appendChild(row('Song', el('select', { onchange: e => { o.vocals = e.target.value; render(); } }, [['instrumental', 'Instrumental (the lead plays the melody)'], ['singer', 'With singer (+ backing vocals)']].map(([v, l]) => el('option', { value: v, selected: o.vocals === v ? true : null }, l)))));
+          if (o.vocals === 'singer') {
+            c1.appendChild(row('Voice', el('select', { onchange: e => { o.voice = e.target.value; } }, [['auto', 'Auto (changes with the idea)'], ['male', 'Male'], ['female', 'Female']].map(([v, l]) => el('option', { value: v, selected: o.voice === v ? true : null }, l)))));
+            c1.appendChild(row('Backing', el('select', { 'data-order': 'keep', onchange: e => { o.choir = e.target.value; } }, [['auto', 'Auto (2–3 voices, style of the genre)'], ['2', '2 voices'], ['3', '3 voices'], ['none', 'No backing vocals']].map(([v, l]) => el('option', { value: v, selected: String(o.choir) === v ? true : null }, l)))));
+          }
         }
       }
       c1.appendChild(row('Complexity', slider('complexity', v => v < 0.3 ? 'Simple' : v < 0.7 ? 'Normal' : 'Advanced')));
       c1.appendChild(row('Density', slider('density', v => v < 0.3 ? 'Sparse' : v < 0.7 ? 'Medium' : 'Busy')));
       const seedIn = el('input', { type: 'number', min: 1, value: o.seed, style: { width: '80px' }, onchange: e => { o.seed = +e.target.value || 1; } });
-      c1.appendChild(row('Idea', el('div', { class: 'sg-inline' }, [seedIn,
-        el('button', { class: 'btn small', 'data-help': 'A new composition with the same options', onclick: () => { o.seed = SG.newSeed(); seedIn.value = o.seed; if (base.types && !(o.songType && base.types[o.songType])) { o = Object.assign(SG.variedDefaults(o.genre, o.seed), { songType: 'auto', complexity: o.complexity, density: o.density, structure: o.structure, extras: o.extras, ending: o.ending }); render(); } } }, '🎲 New idea'),
+      c1.appendChild(row('Idea', el('div', { class: 'sg-inline', 'data-help': 'Every new song is a new idea. The idea number is saved in the song: the same options with the same idea rebuild the same song.' }, [seedIn,
+        el('button', { class: 'btn small', 'data-help': 'A new composition with the same options', onclick: () => { o.seed = SG.newSeed(); seedIn.value = o.seed; if (base.types && !(o.songType && base.types[o.songType])) { o = SG.startDefaults(Object.assign(SG.variedDefaults(o.genre, o.seed), { songType: 'auto', complexity: o.complexity, density: o.density, structure: o.structure, extras: o.extras, ending: o.ending })); render(); } } }, '🎲 New idea'),
         SG.last && SG.last.seed ? el('button', { class: 'btn small', 'data-help': 'Use again the idea (seed) of the last generated song: same options + same idea = the same song', onclick: () => { o.seed = SG.last.seed; seedIn.value = o.seed; } }, '↺ Last #' + SG.last.seed) : null,
         songGen ? el('button', { class: 'btn small', 'data-help': 'Load every option and the idea saved in the current song (to rebuild it or make a variation)', onclick: () => { o = Object.assign(SG.defaults(songGen.opts.genre, songGen.seed), SDAW.deepCopy(songGen.opts)); render(); } }, '📄 This song #' + songGen.seed) : null])));
-      c1.appendChild(el('div', { class: 'st-note', style: { marginTop: 0 } }, 'Every new song is a new idea. The idea number is saved in the song: the same options with the same idea rebuild the same song.'));
 
       /* ---- column 2: progressions ---- */
       const c2 = el('div', { class: 'sg-col' });
-      c2.appendChild(el('div', { class: 'ag-sub' }, 'Progressions (' + st.progs.length + ' in the ' + o.genre + ' library)'));
+      const chamberSections = st.classical ? el('div', {}) : null;
+      if (chamberSections) SDAW.classical.controls(c2, chamberSections, o, st, secs, row, render);
+      c2.appendChild(el('div', { class: 'ag-sub', 'data-help': 'Intro and Outro take their own progressions (turnarounds, endings) or reuse the chorus and end on the tonic.' + (o.genre === 'Blues' ? ' Blues uses few progressions: the 12-bar form is the genre.' : '') },
+        'Progressions (' + st.progs.length + ' in the ' + o.genre + ' library)'));
       const groups = [...new Set(secs.map(x => SG.groupOf(x.type)))].filter(g => g !== 'intro' && g !== 'outro');
       const flats = SG.prefersFlats(o.key, o.mode);
       groups.forEach(g => {
         const list = SG.progsFor(st, g, o.mode);
-        const sel = el('select', { onchange: e => { o.progs[g] = e.target.value; render(); } },
+        const sel = el('select', { 'data-help': list.length ? list.length + ' progressions of the genre for this section' : 'Generic progression (none tagged for this section)', onchange: e => { o.progs[g] = e.target.value; render(); } },
           [el('option', { value: 'auto' }, 'Auto — the program chooses')].concat(list.map(p => el('option', { value: p.c, selected: o.progs[g] === p.c ? true : null }, p.n))));
         const cur = o.progs[g] && o.progs[g] !== 'auto' ? o.progs[g] : null;
-        c2.appendChild(el('div', { class: 'sg-prog' }, [el('b', {}, { verse: 'Verse', chorus: 'Chorus', pre: 'Pre-Chorus', bridge: 'Bridge', solo: 'Solo / Mambo / Jaleo' }[g] || g), sel,
-          el('div', { class: 'sg-chords' }, cur ? cur.split(' ').map(t => el('span', {}, t + ' → ' + t.split('-').map(h => SG.romanToName(h, o.key, flats)).join('·'))) : [el('em', {}, list.length ? list.length + ' progressions of the genre for this section' : 'Generic progression (none tagged for this section)')])]));
+        // one line per section; the chords appear only when a progression is chosen
+        c2.appendChild(el('div', { class: 'sg-prog' + (cur ? ' chosen' : '') }, [
+          el('b', {}, (st.classical ? { verse: 'Exposition', chorus: 'Return', pre: 'Answer', bridge: 'Development', solo: 'Episode / Cadenza' } : { verse: 'Verse', chorus: 'Chorus', pre: 'Pre-Chorus', bridge: 'Bridge', solo: 'Solo / Mambo / Jaleo' })[g] || g), sel,
+          cur ? el('div', { class: 'sg-chords' }, cur.split(' ').map(t => el('span', {}, t + ' → ' + t.split('-').map(h => SG.romanToName(h, o.key, flats)).join('·')))) : null]));
       });
-      c2.appendChild(el('div', { class: 'st-note' }, 'Intro and Outro take their own progressions (turnarounds, endings) or reuse the chorus and end on the tonic. ' +
-        (o.genre === 'Blues' ? 'Blues uses few progressions: the 12-bar form is the genre.' : '')));
-      c2.appendChild(el('div', { class: 'ag-sub' }, 'Melody — what the lead may use'));
-      c2.appendChild(el('div', { class: 'st-note', style: { marginTop: 0 } }, 'The program decides where each one fits: runs in solos and climaxes, triplets in answers and pickups, bends in choruses and solos, harmonics on calm endings, slides into phrases…'));
-      const M = [['complex', 'Complex lines (leaps, 16ths, variations)'], ['fast', 'Fast runs'], ['triplets', 'Triplets'], ['modes', 'Mix modes / scales per section'], ['slides', 'Slides'], ['harmonics', 'Harmonics (guitar)'], ['bends', 'Bends'], ['vibrato', 'Vibrato']];
-      c2.appendChild(el('div', { class: 'sg-mel' }, M.map(([k, l]) => el('label', { class: 'ag-check-opt' }, [el('input', { type: 'checkbox', checked: o.melody[k] ? true : null, onchange: e => { o.melody[k] = e.target.checked; } }), l]))));
+      if (!st.classical) {
+        // Lead options: melody techniques, the guitarist style and what the lead plays per section — folded by default
+        const heroName = SDAW.legends && SDAW.legends.HEROES[o.melody.hero] ? SDAW.legends.HEROES[o.melody.hero].name : 'Auto';
+        c2.appendChild(el('button', { class: 'sg-fold' + (leadOpen ? ' open' : ''), 'aria-expanded': leadOpen ? 'true' : 'false',
+          'data-help': 'Techniques the lead may use, the guitarist whose style the lead guitar plays, and what the lead plays in each section',
+          onclick: () => { leadOpen = !leadOpen; render(); } }, [el('span', { class: 'sg-fold-arrow' }, leadOpen ? '▾' : '▸'), ' Lead options', el('small', {}, ' · style: ' + heroName)]));
+        const lead = el('div', { class: 'sg-fold-body' + (leadOpen ? '' : ' hidden') });
+        c2.appendChild(lead);
+        lead.appendChild(el('div', { class: 'ag-sub', 'data-help': 'The program decides where each one fits: runs in solos and climaxes, triplets in answers and pickups, bends in choruses and solos, harmonics on calm endings, slides into phrases…' }, 'Melody — what the lead may use'));
+        const M = [['complex', 'Complex lines (leaps, 16ths, variations)'], ['fast', 'Fast runs'], ['triplets', 'Triplets'], ['modes', 'Mix modes / scales per section'], ['slides', 'Slides'], ['harmonics', 'Harmonics (guitar)'], ['bends', 'Bends'], ['vibrato', 'Vibrato']];
+        lead.appendChild(el('div', { class: 'sg-mel' }, M.map(([k, l]) => el('label', { class: 'ag-check-opt' }, [el('input', { type: 'checkbox', checked: o.melody[k] ? true : null, onchange: e => { o.melody[k] = e.target.checked; } }), l]))));
 
-      // lead guitar "in the style of" a great guitarist (legends.js)
-      if (SDAW.legends) {
-        const heroSel = el('select', { onchange: e => { o = SG.artistPreset(o, e.target.value); render(); } },
-          SDAW.legends.options(st).map(([v, l]) => el('option', { value: v, selected: (o.melody.hero || 'auto') === v ? true : null }, l)));
-        c2.appendChild(el('div', { class: 'ag-sub' }, '🎸 Lead guitar in the style of'));
-        c2.appendChild(heroSel);
-        const hh = SDAW.legends.HEROES[o.melody.hero];
-        c2.appendChild(el('div', { class: 'st-note', style: { marginTop: '4px' } }, hh ? hh.name + ': ' + hh.tag + '.' :
-          'When the lead instrument is a guitar, its solos and melodies use the scales, techniques and phrasing of a guitarist of the genre (★). Original phrases over your chords — not copies of recorded solos. The rhythm guitar has its own styles in the band list (riffs, shuffles…).'));
+        // lead guitar "in the style of" a great guitarist (legends.js)
+        if (SDAW.legends) {
+          const heroSel = el('select', { onchange: e => { o = SG.artistPreset(o, e.target.value); render(); } },
+            SDAW.legends.options(st).map(([v, l]) => el('option', { value: v, selected: (o.melody.hero || 'auto') === v ? true : null }, l)));
+          lead.appendChild(el('div', { class: 'ag-sub', 'data-help': 'When the lead instrument is a guitar, its solos and melodies use the scales, techniques and phrasing of a guitarist of the genre (★). Original phrases over your chords — not copies of recorded solos. The rhythm guitar has its own styles in the band list (riffs, shuffles…).' }, '🎸 Lead guitar in the style of'));
+          lead.appendChild(heroSel);
+          const hh = SDAW.legends.HEROES[o.melody.hero];
+          if (hh) lead.appendChild(el('div', { class: 'st-note', style: { marginTop: '4px' } }, hh.name + ': ' + hh.tag + '.'));
+        }
+
+        // the lead in every section of the form: a theme, a solo, a riff, answers or silence
+        lead.appendChild(el('div', { class: 'ag-sub', 'data-help': 'Solo = the same dynamics as the solos (fast scales, licks, riffs, bends) from the first verse — for instrumental songs. With a singer, the lead keeps to the breaths of the voice in the sung sections.' }, '🎼 Lead — what it plays in each section'));
+        const presetOf = () => Object.keys(SG.LEAD_PRESETS).find(k => { const pl = SG.LEAD_PRESETS[k].plan; return SG.LEAD_SECTIONS.every(([sk]) => (pl[sk] || 'auto') === (o.leadPlan[sk] || 'auto')); }) || 'custom';
+        lead.appendChild(el('select', { class: 'sg-lp-preset', onchange: e => { if (SG.LEAD_PRESETS[e.target.value]) o.leadPlan = Object.assign({}, SG.LEAD_PRESETS[e.target.value].plan); render(); } },
+          Object.keys(SG.LEAD_PRESETS).map(k => el('option', { value: k, selected: presetOf() === k ? true : null }, SG.LEAD_PRESETS[k].n)).concat([el('option', { value: 'custom', selected: presetOf() === 'custom' ? true : null }, 'Custom (choose below)')])));
+        const inForm = new Set(secs.map(x => x.type === 'part' ? 'verse' : x.type));
+        lead.appendChild(el('div', { class: 'sg-lp' }, SG.LEAD_SECTIONS.filter(([k]) => inForm.has(k)).map(([k, l]) => el('label', { class: 'sg-lp-row' }, [el('span', {}, l),
+          el('select', { onchange: e => { o.leadPlan[k] = e.target.value; render(); } }, SG.LEAD_MODES.map(([v, t]) => el('option', { value: v, selected: (o.leadPlan[k] || 'auto') === v ? true : null }, t)))]))));
       }
-
-      // the lead in every section of the form: a theme, a solo, a riff, answers or silence
-      c2.appendChild(el('div', { class: 'ag-sub' }, '🎼 Lead — what it plays in each section'));
-      const presetOf = () => Object.keys(SG.LEAD_PRESETS).find(k => { const pl = SG.LEAD_PRESETS[k].plan; return SG.LEAD_SECTIONS.every(([sk]) => (pl[sk] || 'auto') === (o.leadPlan[sk] || 'auto')); }) || 'custom';
-      c2.appendChild(el('select', { class: 'sg-lp-preset', onchange: e => { if (SG.LEAD_PRESETS[e.target.value]) o.leadPlan = Object.assign({}, SG.LEAD_PRESETS[e.target.value].plan); render(); } },
-        Object.keys(SG.LEAD_PRESETS).map(k => el('option', { value: k, selected: presetOf() === k ? true : null }, SG.LEAD_PRESETS[k].n)).concat([el('option', { value: 'custom', selected: presetOf() === 'custom' ? true : null }, 'Custom (choose below)')])));
-      const inForm = new Set(secs.map(x => x.type === 'part' ? 'verse' : x.type));
-      c2.appendChild(el('div', { class: 'sg-lp' }, SG.LEAD_SECTIONS.filter(([k]) => inForm.has(k)).map(([k, l]) => el('label', { class: 'sg-lp-row' }, [el('span', {}, l),
-        el('select', { onchange: e => { o.leadPlan[k] = e.target.value; render(); } }, SG.LEAD_MODES.map(([v, t]) => el('option', { value: v, selected: (o.leadPlan[k] || 'auto') === v ? true : null }, t)))]))));
-      c2.appendChild(el('div', { class: 'st-note', style: { marginTop: '4px' } }, 'Solo = the same dynamics as the solos (fast scales, licks, riffs, bends) from the first verse — for instrumental songs. With a singer, the lead keeps to the breaths of the voice in the sung sections.'));
 
       /* ---- column 3: band ---- */
       const c3 = el('div', { class: 'sg-col sg-band' });
-      c3.appendChild(el('div', { class: 'ag-sub' }, 'Band — instruments, how they play, effects'));
+      c3.appendChild(el('div', { class: 'ag-sub' }, st.classical ? 'Chamber instruments and effects' : 'Band — instruments, how they play, effects'));
       if (st.tracks.some(sp => SG.rigModelFor(o.tracks[sp.id] ? o.tracks[sp.id].inst : sp.inst, sp.fx))) {
         const rigOk = SG.rigAvailable();
         c3.appendChild(row('🎸 Guitars', el('select', { disabled: rigOk ? null : true, onchange: e => { o.guitarEngine = e.target.value; } }, [
           el('option', { value: 'rig', selected: (o.guitarEngine || 'rig') === 'rig' && rigOk ? true : null }, 'Guitar Rig — real recordings, real amps'),
           el('option', { value: 'light', selected: o.guitarEngine === 'light' || !rigOk ? true : null }, 'Light synth (old guitar engine)')])));
         c3.appendChild(el('div', { class: 'st-note', style: { marginTop: 0 } }, rigOk
-          ? 'Guitar Rig: every guitar of the band plays a real guitar (nylon, steel, Strat, Les Paul, hollow body) through the amp, cabinet and effects of the genre preset (FX column).'
+          ? 'Real guitars through the amp and effects of the FX column.'
           : 'Guitar Rig is not available in this browser (needs AudioWorklet: Chrome / Edge) — the light guitars play.'));
       }
       const tbl = el('div', { class: 'sg-tracks' });
       st.tracks.forEach(sp => {
         const tr = o.tracks[sp.id];
-        const alt = sp.role === 'drums' ? [sp.inst] : (SDAW.STYLE_ALT[sp.alt] || (sp.role === 'bass' ? SDAW.STYLE_ALT.bass : [sp.inst]));
+        const alt = sp.role === 'drums' ? [sp.inst] : (sp.alternatives || SDAW.STYLE_ALT[sp.alt] || (sp.role === 'bass' ? SDAW.STYLE_ALT.bass : [sp.inst]));
         const insts = [...new Set([sp.inst].concat(alt))];
-        const ico = sp.role === 'drums' ? '🥁' : sp.role === 'bass' ? '🎸' : ['melody', 'horns', 'horn2', 'counter'].includes(sp.role) ? '🎺' : '🎹';
+        const ico = st.classical ? ({ piano: '🎹', guitar: '🎸' })[sp.id] || '🎻' : sp.role === 'drums' ? '🥁' : sp.role === 'bass' ? '🎸' : ['melody', 'horns', 'horn2', 'counter'].includes(sp.role) ? '🎺' : '🎹';
         tbl.appendChild(el('div', { class: 'sg-track' + (tr.on ? '' : ' off') }, [
           el('label', { class: 'sg-tname' }, [el('input', { type: 'checkbox', checked: tr.on ? true : null, onchange: e => { tr.on = e.target.checked; render(); } }), el('span', {}, ico + ' ' + sp.name)]),
           el('select', { title: 'Instrument', disabled: sp.role === 'drums' ? true : null, onchange: e => { tr.inst = e.target.value; } }, insts.map(n => el('option', { value: n, selected: tr.inst === n ? true : null }, n))),
           sp.plays ? el('select', { title: 'How it plays', onchange: e => { tr.play = e.target.value; } }, sp.plays.map(pl => el('option', { value: pl, selected: tr.play === pl ? true : null }, PLAY_LABEL[pl] || pl)))
-            : el('span', { class: 'sg-role' }, ROLE_LABEL[sp.role] || sp.role),
+            : el('span', { class: 'sg-role' }, st.classical ? '' : ROLE_LABEL[sp.role] || sp.role),
           el('select', { title: 'Effects', onchange: e => { tr.fx = e.target.value; } }, Object.keys(SG.FX).map(n => el('option', { value: n, selected: tr.fx === n ? true : null }, n)))
         ]));
       });
@@ -1452,24 +1550,27 @@
           el('button', { class: 'btn small', title: 'Remove', onclick: () => { o.extras.splice(i, 1); render(); } }, '✕')]));
       });
       c3.appendChild(tbl);
-      const kinds = [['', '＋ Add an instrument…']].concat(Object.keys(SG.EXTRA_KINDS).filter(k => !SG.EXTRA_KINDS[k].needsLead || st.tracks.some(t => t.lead)).map(k => [k, SG.EXTRA_KINDS[k].n])).concat([['perc', 'Percussion (güiro, congas, bongó, maracas…)']]);
-      const kindSel = el('select', { onchange: () => fillInst() }, kinds.map(([v, l]) => el('option', { value: v }, l)));
-      const instSel = el('select', {});
-      function fillInst() {
-        const k = kindSel.value; instSel.innerHTML = '';
-        const list = !k ? [] : k === 'perc' ? SG.percussionList().map(p => [p.id, p.n]) : (SDAW.STYLE_ALT[SG.EXTRA_KINDS[k].list] || []).map(n => [n, n]);
-        list.forEach(([v, l]) => instSel.appendChild(el('option', { value: v }, l)));
-        instSel.disabled = !list.length;
+      if (chamberSections) c3.appendChild(chamberSections);
+      if (!st.classical) {
+        const kinds = [['', '＋ Add an instrument…']].concat(Object.keys(SG.EXTRA_KINDS).filter(k => !SG.EXTRA_KINDS[k].needsLead || st.tracks.some(t => t.lead)).map(k => [k, SG.EXTRA_KINDS[k].n])).concat([['perc', 'Percussion (güiro, congas, bongó, maracas…)']]);
+        const kindSel = el('select', { onchange: () => fillInst() }, kinds.map(([v, l]) => el('option', { value: v }, l)));
+        const instSel = el('select', {});
+        function fillInst() {
+          const k = kindSel.value; instSel.innerHTML = '';
+          const list = !k ? [] : k === 'perc' ? SG.percussionList().map(p => [p.id, p.n]) : (SDAW.STYLE_ALT[SG.EXTRA_KINDS[k].list] || []).map(n => [n, n]);
+          list.forEach(([v, l]) => instSel.appendChild(el('option', { value: v }, l)));
+          instSel.disabled = !list.length;
+        }
+        fillInst();
+        c3.appendChild(el('div', { class: 'sg-add' }, [kindSel, instSel, el('button', { class: 'btn small primary', onclick: () => {
+          const k = kindSel.value; if (!k || !instSel.value) return SDAW.toast('Choose what to add and the instrument');
+          const id = 'x' + Date.now().toString(36) + o.extras.length;
+          if (k === 'perc') { const pc = SG.percussionList().find(p => p.id === instSel.value); o.extras.push({ id, kind: pc.id, inst: pc.inst }); }
+          else o.extras.push({ id, kind: k, inst: instSel.value });
+          render();
+        } }, 'Add')]));
+        c3.appendChild(el('div', { class: 'st-note', style: { marginTop: '4px' } }, 'Any instrument can join the band: a sax counter-melody, a trumpet in 3rds with the lead, a pad, a güiro… The singer is chosen under Vocals (column 1).'));
       }
-      fillInst();
-      c3.appendChild(el('div', { class: 'sg-add' }, [kindSel, instSel, el('button', { class: 'btn small primary', onclick: () => {
-        const k = kindSel.value; if (!k || !instSel.value) return SDAW.toast('Choose what to add and the instrument');
-        const id = 'x' + Date.now().toString(36) + o.extras.length;
-        if (k === 'perc') { const pc = SG.percussionList().find(p => p.id === instSel.value); o.extras.push({ id, kind: pc.id, inst: pc.inst }); }
-        else o.extras.push({ id, kind: k, inst: instSel.value });
-        render();
-      } }, 'Add')]));
-      c3.appendChild(el('div', { class: 'st-note', style: { marginTop: '4px' } }, 'Any instrument can join the band: a sax counter-melody, a trumpet in 3rds with the lead, a pad, a güiro… The singer is chosen under Vocals (column 1).'));
       body.append(c1, c2, c3);
     }
     function row(label, ctrl) { return el('div', { class: 'st-row ag-row' }, [el('label', {}, label), ctrl, el('span')]); }
@@ -1488,7 +1589,12 @@
           el('span', { class: 'sg-warn' }, init.genre ? 'A new song with everything you chose — every instrument stays editable.' : '⚠ Replaces every track of the current song (Ctrl+Z restores it).'),
           el('span', { class: 'spacer' }),
           el('button', { class: 'btn', onclick: close }, 'Cancel'),
-          el('button', { class: 'btn primary ag-go', onclick: () => { SG.last = SDAW.deepCopy(o); close(); setTimeout(() => { SG.generateFullSong(o); if (init.onDone) init.onDone(); }, 20); } }, init.genre ? '✨ Create the song' : '✨ Generate Full Song')
+          el('button', { class: 'btn primary ag-go', onclick: () => {
+            if (SDAW.STYLES[o.genre].classical && !Object.values(o.tracks).some(t => t.on)) {
+              SDAW.toast('Select at least one instrument');
+              return;
+            }
+            SG.last = SDAW.deepCopy(o); close(); setTimeout(() => { SG.generateFullSong(o); if (init.onDone) init.onDone(); }, 20); } }, init.genre ? '✨ Create the song' : '✨ Generate Full Song')
         ])
       ])
     ]);

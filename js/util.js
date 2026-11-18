@@ -56,6 +56,38 @@ window.LSS = window.SDAW;
     return node;
   };
 
+  /* ------------------------------------------- ALPHABETICAL ORDER --- */
+  /** compare two labels alphabetically (emoji / symbols in front are ignored, accents fold: "Biréli" next to "Bill") */
+  SDAW.byName = (a, b) => {
+    const key = x => String(x).replace(/^[^\p{L}\p{N}]+/u, '');
+    return key(a).localeCompare(key(b), 'en', { sensitivity: 'base', numeric: true });
+  };
+  /** option values that stay in front of a sorted list ("Auto…", "Off…", placeholders) or at its end ("Custom…") */
+  SDAW.SORT_PIN_FIRST = ['', 'auto', 'off', 'tonic', 'jazz', 'song', 'lead'];
+  SDAW.SORT_PIN_LAST = ['custom'];
+  /**
+   * Sort the options of every <select> inside `root` alphabetically. Selects whose order means
+   * something (keys, modes, forms, counts…) carry data-order="keep" and are left alone. The
+   * selected option stays selected; optgroups are sorted inside themselves.
+   */
+  SDAW.sortSelects = function (root) {
+    if (!root) return;
+    const sortIn = parent => {
+      const opts = [...parent.children].filter(n => n.tagName === 'OPTION');
+      if (opts.length < 3) return;
+      const first = opts.filter(o => SDAW.SORT_PIN_FIRST.includes(o.value));
+      const last = opts.filter(o => SDAW.SORT_PIN_LAST.includes(o.value));
+      const rest = opts.filter(o => !first.includes(o) && !last.includes(o)).sort((x, y) => SDAW.byName(x.textContent, y.textContent));
+      [...first, ...rest, ...last].forEach(o => parent.appendChild(o));
+    };
+    root.querySelectorAll('select:not([data-order="keep"])').forEach(sel => {
+      const chosen = sel.value;
+      sortIn(sel);
+      sel.querySelectorAll('optgroup').forEach(sortIn);
+      sel.value = chosen;
+    });
+  };
+
   /** Create an SVG element */
   SDAW.svg = function (tag, attrs, children) {
     const node = document.createElementNS('http://www.w3.org/2000/svg', tag);

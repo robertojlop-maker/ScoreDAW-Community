@@ -274,8 +274,10 @@
     r.setValueAtTime(base, time);
     const sl = tech.slide;
     if (sl) {
-      const st = T.slideTime || 0.12;
-      if ((sl === true || sl === 'shift' || sl === 'legato') && prevPitch !== undefined) { r.setValueAtTime(base * Math.pow(2, (prevPitch - pitch) / 12), time); r.linearRampToValueAtTime(base, time + st); }
+      const st = SDAW.clamp(tech.slideTime || T.slideTime || 0.12, 0.03, 0.4);
+      // A written double-stop slide carries its own interval per string.
+      const from = Number.isFinite(tech.slideInterval) ? pitch - tech.slideInterval : prevPitch;
+      if ((sl === true || sl === 'shift' || sl === 'legato') && from !== undefined) { r.setValueAtTime(base * Math.pow(2, (from - pitch) / 12), time); r.linearRampToValueAtTime(base, time + st); }
       else if (sl === 'inBelow') { r.setValueAtTime(base * Math.pow(2, -4 / 12), time); r.linearRampToValueAtTime(base, time + st); }
       else if (sl === 'inAbove') { r.setValueAtTime(base * Math.pow(2, 4 / 12), time); r.linearRampToValueAtTime(base, time + st); }
       else if (sl === 'outDown') { r.setValueAtTime(base, time + dur * 0.65); r.linearRampToValueAtTime(base * Math.pow(2, -7 / 12), time + dur); }
@@ -421,6 +423,10 @@
     const params = track.params || {};
     let engine = track.engine;
     if (track.sampler && track.sampler.zones && track.sampler.zones.length && playSampler(track, pitch, time, dur, opts)) return;
+    if (engine === 'bowed') {
+      if (SDAW.bowed.play(c, track, pitch, time, dur, opts, ch.input, keep)) return;
+      engine = 'strings'; // Preserve playback if recordings fail to load.
+    }
     if (engine === 'gen') { SDAW.genPlay(A, track, pitch, time, dur, opts, ch.input); return; }   // 3x Osc generator (generators.js)
     if (engine === 'rig') {                                // Guitar Rig: real recordings + amps (guitarrig.js)
       if (SDAW.guitarRig && SDAW.guitarRig.active(track) && SDAW.guitarRig.play(track, pitch, time, dur, opts)) return;
@@ -445,8 +451,9 @@
         src.start(time, Math.random()); src.stop(time + 0.12);
         return;
       }
-      if (tech.harm) {                                   // natural harmonic: bell-like sine an octave up
-        const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = SDAW.midiToFreq(pitch + 12);
+      if (tech.harm || tech.aharm) {                     // harmonic: bell-like sine (natural: the node of its fret; artificial: an octave up)
+        const nat = tech.harm && opts.string >= 0 && CONFIG.guitarRig && CONFIG.guitarRig.harmonics[opts.fret];
+        const o = c.createOscillator(); o.type = 'sine'; o.frequency.value = SDAW.midiToFreq(nat ? CONFIG.guitar.tuning[opts.string] + nat : pitch + 12);
         o.connect(env(ch.input, time, 0.45 * vel, 0.003, 0.02, Math.max(1.2, dur * 1.5)));
         o.start(time); o.stop(time + Math.max(1.3, dur * 1.6));
         return;
@@ -560,11 +567,34 @@
   }
 
   /* ========================================================= PREVIEW == */
+  function previewWhenReady(track, action) {
+    const context = A.ctx;
+    const ready = SDAW.bowed.whenReady(track, context);
+    if (!ready) { action(); return; }
+    ready.catch(() => {}).then(() => { if (A.ctx === context && !A.offline) action(); });
+  }
+  let bowedPreview = 0;
+  A.previewBowed = function (track) {
+    A.init();
+    const token = ++bowedPreview;
+    previewWhenReady(track, () => {
+      if (token !== bowedPreview) return;
+      A.updateTrack(track);
+      const tonic = track.params?.bowed?.startsWith('violin') ? 62 : 55, time = A.ctx.currentTime + .02;
+      [[0, 0, .28], [4, .3, .32], [7, .64, .36], [12, 1.02, 1.22]].forEach(([iv, at, dur], i) =>
+        playMelodic(track, tonic + iv, time + at, dur, { vel: 74 + i * 8 }));
+    });
+  };
+
   A.previewNote = function (track, pitch, opts) {
     if (!CONFIG.audio.previewOnClick) return;
     A.init();
     if (!track) return;
     if (track.type === 'drums') return A.previewDrum(track, 'snare');
+    if (track.engine === 'bowed') {
+      previewWhenReady(track, () => playMelodic(track, pitch, A.ctx.currentTime + .01, opts?.dur || .6, { vel: 96, ...opts }));
+      return;
+    }
     A.updateTrack(track);
     if (track.sampler && track.sampler.zones && track.sampler.zones.length) { playMelodic(track, pitch, A.ctx.currentTime + 0.01, (opts && opts.dur) || 0.8, Object.assign({ vel: 100 }, opts || {})); return; }
     A.updateTrack(track);
@@ -580,6 +610,8 @@
   /** Preview a library instrument without a track (temporary track object) */
   A.previewInstrument = function (inst) {
     const tmp = SDAW.makeTrack(inst); tmp.id = '__preview';
+    if (tmp.engine === 'bowed') { A.previewBowed(tmp); return; }
+    bowedPreview++;
     A.init(); A.updateTrack(tmp);
     // the previous preview's notes still waiting for their recordings are dropped
     [SDAW.guitarRig, SDAW.pianoRig, SDAW.windRig].forEach(R => { const r = R && R.rigOf('__preview'); if (r) r.queue = []; });
@@ -653,7 +685,7 @@
           group.sort((a, b) => up ? b.pitch - a.pitch : a.pitch - b.pitch);
           for (let k = ((+st - o) % L + L) % L; k < len; k += L) {
             const at = start + k, whole = Math.floor(at + 1e-6);
-            group.forEach((n, i) => add(whole, { track: t, note: n, strumIndex: i, frac: at - whole, dur: eff[n.id] || n.dur }));
+            group.forEach((n, i) => add(whole, { track: t, note: n, strumIndex: i, frac: at - whole, dur: eff[n.id] || n.dur, tied: !!eff[n.id] }));
           }
         });
       }
@@ -673,6 +705,26 @@
         if (c.kind === 'pattern') addPattern(t, store.pattern(c.patternId), c.start, c.len, c.offsetTicks);
         else if (c.kind === 'audio') { add(c.start, { track: t, audio: c }); A.audioClips.push({ track: t, clip: c }); }
       }));
+    }
+    if (!A.patternMode) {
+      // Unlike within-pattern ties, cross-clip ties meet only once the arrangement is indexed.
+      // Every melodic instrument (piano, guitar, strings…) holds a tied note instead of striking it again.
+      const heads = new Map();
+      Object.keys(idx).sort((a, b) => a - b).forEach(tick => {
+        idx[tick] = idx[tick].filter(ev => {
+          if (!ev.note) return true;
+          const note = ev.note, at = Number(tick) + ev.frac;
+          const key = ev.track.id + ':' + note.pitch + ':' + (note.voice || 0);
+          const prev = heads.get(key);
+          if (note.tie && prev && Math.abs(prev.at + prev.ev.dur - at) < .001) {
+            prev.ev.dur += ev.dur;
+            prev.ev.tied = true;
+            return false;
+          }
+          heads.set(key, { at, ev });
+          return true;
+        });
+      });
     }
     A.index = idx;
   };
@@ -785,7 +837,6 @@
   function schedule() {
     const c = A.ctx, td = tickDur();
     const anySolo = SDAW.store.song.tracks.some(x => x.solo);
-    const DYN = { ppp: 30, pp: 45, p: 60, mp: 75, mf: 90, f: 105, ff: 118, fff: 127 };
     // A stalled UI must not replay the missed interval as simultaneous notes.
     // Continue from the next unscheduled tick with a fresh audio deadline.
     if (A.nextTime < c.currentTime && !(A.endTimer && A.pos >= A.seq.end)) {
@@ -796,7 +847,7 @@
       if (A.endTimer && A.pos >= A.seq.end) break;   // end already reached: nothing more to schedule (and don't push the stop timer later)
       const tick = seqTick(A.pos);
       A.tl.push([A.nextTime, tick]);
-      dispatch(tick, A.nextTime, td, anySolo, DYN);
+      dispatch(tick, A.nextTime, td, anySolo);
       if (CONFIG.audio.metronome && tick % SDAW.beatTicks() === 0) {          // a click on every beat of the meter
         const o = c.createOscillator(); o.frequency.value = tick % SDAW.barTicks() === 0 ? 1600 : 1000;
         o.connect(env(A.master, A.nextTime, CONFIG.audio.metronomeVolume, 0.001, 0, 0.05)); o.start(A.nextTime); o.stop(A.nextTime + 0.08);
@@ -853,10 +904,10 @@
     });
   }
 
+  const DYN = { ppp: 30, pp: 45, p: 60, mp: 75, mf: 90, f: 105, ff: 118, fff: 127 };
   /** Play every event of one tick at a given context time */
-  function dispatch(tick, at, td, anySolo, DYN) {
+  function dispatch(tick, at, td, anySolo, evs = A.index[tick] || []) {
       try { applyAutomation(tick, at, anySolo, false); } catch (err) { A.eventError(err, null); }
-      const evs = A.index[tick] || [];
       evs.forEach(ev => { try {
         const t = ev.track;
         if (t.mute || (anySolo && !t.solo)) return;
@@ -876,7 +927,7 @@
           if (tech.trem) {                      // tremolo picking: repeated 32nd notes
             const step = td / 2;
             for (let x = 0; x < dur - step * 0.5; x += step) playMelodic(t, n.pitch, time + x, step * 0.9, { vel: vel * (x ? 0.85 : 1), tech: {}, strumIndex: ev.strumIndex, string: n.string, fret: n.fret, tick: tick + (ev.frac || 0) });
-          } else playMelodic(t, n.pitch, time + Math.max(0, hum), dur, { vel, tech, prevPitch: A.lastPitch[t.id], strumIndex: ev.strumIndex, string: n.string, fret: n.fret, tick: tick + (ev.frac || 0) });
+          } else playMelodic(t, n.pitch, time + Math.max(0, hum), dur, { vel, tech, prevPitch: A.lastPitch[t.id], strumIndex: ev.strumIndex, string: n.string, fret: n.fret, tick: tick + (ev.frac || 0), heldBow: ev.heldBow });
           A.lastPitch[t.id] = n.pitch;
         }
       } catch (err) { A.eventError(err, ev); } });
@@ -906,7 +957,7 @@
    * { trackId: [[seconds, key, vel, channel], …] } (seconds from the song start).
    */
   const trackById = (id) => SDAW.store.track(id);
-  function collectPluginEvents(td, anySolo, DYN) {
+  function collectPluginEvents(td, anySolo) {
     const out = {};
     for (let pos = A.seq.start, i = 0; pos < A.seq.end; pos++, i++) {
       const tick = seqTick(pos), evs = A.index[tick];
@@ -963,12 +1014,12 @@
       if (SDAW.guitarRig) { if (opts.onProgress) opts.onProgress(0.005); await SDAW.guitarRig.prepareOffline(oc); }
       if (SDAW.pianoRig) await SDAW.pianoRig.prepareOffline(oc);
       if (SDAW.windRig) await SDAW.windRig.prepareOffline(oc);
+      await Promise.allSettled(SDAW.store.song.tracks.map(t => SDAW.bowed.whenReady(t, oc)));
       const anySolo = SDAW.store.song.tracks.some(x => x.solo);
       applyAutomation(seqTick(A.seq.start), 0.1, anySolo, true);
-      const DYN = { ppp: 30, pp: 45, p: 60, mp: 75, mf: 90, f: 105, ff: 118, fff: 127 };
       // plugin tracks (Windows version): rendered by the native engine, then mixed through their track chain
       if (SDAW.desktop && SDAW.desktop.on) {
-        const evs = collectPluginEvents(td, anySolo, DYN);
+        const evs = collectPluginEvents(td, anySolo);
         if (Object.keys(evs).length) {
           if (opts.onProgress) opts.onProgress(0.01);
           const bufs = await SDAW.desktop.renderTracks(evs, seconds, oc);
@@ -982,7 +1033,7 @@
       // schedule window by window (like the live scheduler): few nodes alive at a time
       let time = 0.1, pos = A.seq.start;
       const scheduleUntil = (limit) => {
-        while (pos < A.seq.end && time < limit) { dispatch(seqTick(pos), time, td, anySolo, DYN); pos++; time += td; }
+        while (pos < A.seq.end && time < limit) { dispatch(seqTick(pos), time, td, anySolo); pos++; time += td; }
         // Guitar Rig note-offs held back for slides / hammer-ons: final once every earlier note is known
         if (SDAW.guitarRig) SDAW.guitarRig.flushOffline(oc, pos >= A.seq.end ? Infinity : limit);
         if (SDAW.pianoRig) SDAW.pianoRig.flushOffline(oc, pos >= A.seq.end ? Infinity : limit);
@@ -1019,7 +1070,7 @@
     // real instruments (Guitar / Piano / Wind Rig) still loading their recordings, amp captures or
     // IRs: wait for them, so the first notes already have the real sound (Stop cancels the wait)
     if (!(popts && popts.noWait)) {
-      const waits = [];
+      const waits = SDAW.store.song.tracks.map(t => SDAW.bowed.whenReady(t, A.ctx)).filter(Boolean);
       SDAW.store.song.tracks.forEach(t => [SDAW.guitarRig, SDAW.pianoRig, SDAW.windRig].forEach(R => {
         const w = R && R.whenReady ? R.whenReady(t) : null; if (w) waits.push(w);
       }));
@@ -1029,7 +1080,7 @@
         SDAW.bus.emit('transport', { playing: false, preparing: true });
         if (SDAW.toast) SDAW.toast('⏳ Loading the real instruments (' + waits.length + ' track' + (waits.length > 1 ? 's' : '') + ')… the song starts when they are ready');
         const limit = new Promise(r => setTimeout(r, (CONFIG.audio.prepareTimeoutSec || 20) * 1000));
-        Promise.race([Promise.all(waits).catch(() => null), limit]).then(() => {
+        Promise.race([Promise.allSettled(waits), limit]).then(() => {
           if (A.prepId !== id || !A.preparing) return;          // Stop was pressed meanwhile
           A.preparing = false;
           A.play(fromTick, { noWait: true });
@@ -1054,7 +1105,21 @@
     (A.audioClips || []).forEach(({ track, clip }) => {
       if (clip.start < A.startTick && clip.start + clip.len > A.startTick) playAudioClip(track, clip, A.startTime, A.startTick - clip.start);
     });
-    applyAutomation(A.startTick, A.startTime, SDAW.store.song.tracks.some(x => x.solo), true);
+    const anySolo = SDAW.store.song.tracks.some(x => x.solo);
+    applyAutomation(A.startTick, A.startTime, anySolo, true);
+    // A seek or resume inside a merged bow tie starts its remaining sustain at the playhead.
+    if (!A.patternMode && A.startTick > 0) {
+      const held = [];
+      for (const tick of Object.keys(A.index)) {
+        if (Number(tick) >= A.startTick) break;
+        A.index[tick].forEach(ev => {
+          if (!ev.tied || ev.track.engine !== 'bowed' || ev.note.tech?.pizz || ev.note.tech?.stacc) return;
+          const left = Number(tick) + ev.frac + ev.dur - A.startTick;
+          if (left > .001) held.push({ ...ev, frac: 0, dur: left, heldBow: true });
+        });
+      }
+      if (held.length) dispatch(A.startTick, A.startTime, tickDur(), anySolo, held);
+    }
     if (SDAW.midiOut) SDAW.midiOut.start();
     if (SDAW.desktop && SDAW.desktop.on) SDAW.desktop.transport(true, A.startTick, A.startTime);
     A.timer = setInterval(schedule, CONFIG.audio.lookaheadMs);

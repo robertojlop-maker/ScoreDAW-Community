@@ -68,10 +68,28 @@ window.CONFIG = {
     /* Show the welcome screen on start */
     showWelcome: true,
 
+    /* Welcome screen ("Start with a style"): the tab and the style selected at start, and the
+     * options that style starts with (also in the Auto Generate Full Song panel).
+     *   kind:      'genre' | 'band' | 'guitarist'
+     *   leadPlan:  a key of SG.LEAD_PRESETS ('showcase' = the lead plays as soloist after the intro)
+     *   melody:    lead techniques ('fast' = fast runs) and the guitarist style ('vanhalen', …)
+     *   vocals:    'instrumental' (the lead carries the song) or 'singer'
+     *   intro:     what the lead plays in the intro, picked with each idea by these weights
+     *              ('riff' = a guitar riff, 'solo' = a tapping / runs opening, 'melody' = a theme) */
+    welcomeDefault: {
+      kind: 'guitarist',
+      style: 'Yngwie Malmsteen',
+      // null = the style starts with its own presets. Example of custom start options (used before for Van Halen):
+      //   { leadPlan: 'showcase', melody: { fast: true, hero: 'vanhalen' }, vocals: 'instrumental',
+      //     intro: { riff: 0.65, solo: 0.2, melody: 0.15 } }
+      options: null
+    },
+
     /* Pixels per 16th-note tick in the arrange view (zoom) */
     arrangeTickWidth: 7,
     /* Pixels per tick in the piano roll */
-    pianoRollTickWidth: 22,
+    pianoRollTickWidth: 22,      // minimum width of a 16th in the Piano Roll (zoom)
+    pianoRollFit: true,          // a short pattern is stretched to fill the width of the Piano Roll
     pianoRollRowHeight: 14,
     /* Bars per line in score / tab view */
     notationBarsPerLine: 4,
@@ -246,6 +264,12 @@ window.CONFIG = {
         { name: 'Grand Piano (light)', engine: 'keys', type: 'keys', source: 'LiveReplica', params: {} },
         { name: 'Electric Piano (light)', engine: 'keys', type: 'keys', source: 'ScoreDAW', params: { tone: 'ep' } },
         { name: 'Organ (light)', engine: 'keys', type: 'keys', source: 'ScoreDAW', params: { tone: 'organ' } }
+      ]},
+      { group: 'Bowed Strings (recorded)', icon: '🎻', items: [
+        { name: 'Solo Violin', engine: 'bowed', type: 'strings', source: 'VSCO 2 CE recordings', params: { bowed: 'violin' } },
+        { name: 'Violin Section', engine: 'bowed', type: 'strings', source: 'VSCO 2 CE recordings', params: { bowed: 'violin-section' } },
+        { name: 'Solo Viola', engine: 'bowed', type: 'strings', source: 'University of Iowa MIS', params: { bowed: 'solo-viola' } },
+        { name: 'Viola Section', engine: 'bowed', type: 'strings', source: 'VSCO 2 CE recordings', params: { bowed: 'viola' } }
       ]},
       { group: 'Strings & Pads', icon: '🎻', items: [
         { name: 'String Ensemble', engine: 'strings', type: 'strings', source: 'LiveReplica', params: {} },

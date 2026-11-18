@@ -18,13 +18,29 @@
   const pr = { scrolled: false };
   SDAW.pianoroll = pr;
 
-  const tw = () => CONFIG.ui.pianoRollTickWidth;
+  // tick width: the zoom of CONFIG.ui.pianoRollTickWidth at least, stretched so a short pattern fills the
+  // whole width of the editor (before, a 1-bar pattern used a small strip on the left of the panel)
+  let fitTw = 0;
+  const tw = () => Math.max(CONFIG.ui.pianoRollTickWidth, fitTw);
   const rh = () => CONFIG.ui.pianoRollRowHeight;
   const rowsH = () => (HIGH - LOW + 1) * rh();
 
-  /** Current notes pattern */
+  /**
+   * Current notes pattern. While the SONG plays, the Piano Roll follows the selected track: it shows
+   * the block being played under the playhead (so the piano / organ part scrolls by as it sounds).
+   */
+  pr.followed = null;
   pr.current = function () {
-    const s = SDAW.store;
+    const s = SDAW.store, A = SDAW.audio;
+    if (A.playing && !A.patternMode) {
+      const t = s.selTrack();
+      if (t && t.type !== 'drums') {
+        const c = s.clipAt(t, Math.floor(A.getTick()));
+        const fp = c && c.kind === 'pattern' ? s.pattern(c.patternId) : null;
+        if (fp && fp.kind === 'notes') { pr.followed = fp; return fp; }
+        if (pr.followed && t.clips.some(x => x.patternId === pr.followed.id)) return pr.followed;   // a gap: keep the last block
+      }
+    } else pr.followed = null;
     let p = s.selPattern();
     if (p && p.kind === 'notes') return p;
     const t = s.selTrack();
@@ -44,7 +60,10 @@
     const s = SDAW.store, p = pr.current();
     const cv = $('#prCanvas');
     const len = p ? Math.max(p.length, BAR()) : BAR() * 4;
-    const W = KEY_W + len * tw() + 40, H = rowsH() + VEL_H;
+    const view = $('#view-pianoroll');
+    const avail = view ? view.clientWidth - KEY_W - 40 - 14 : 0;            // 14 = room for the vertical scrollbar
+    fitTw = CONFIG.ui.pianoRollFit !== false && avail > 0 ? avail / len : 0;
+    const W = Math.ceil(KEY_W + len * tw() + 40), H = rowsH() + VEL_H;
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; cv.style.width = W + 'px'; cv.style.height = H + 'px'; }
     const g = cv.getContext('2d');
     g.clearRect(0, 0, W, H);
@@ -74,12 +93,16 @@
     }
     const t = ownerTrack(p);
     const col = p.color || (t && t.color) || '#ff4fd8';
+    const playing = localTick(p, SDAW.audio.getTick());
     p.notes.forEach(n => {
       if (n.pitch < LOW || n.pitch > HIGH) return;
       const x = KEY_W + n.start * tw(), y = (HIGH - n.pitch) * rh(), w = Math.max(4, n.dur * tw() - 1);
       const sel = s.sel.noteIds.includes(n.id);
-      g.save(); g.shadowColor = sel ? '#fff' : col; g.shadowBlur = sel ? 12 : 6;
-      g.fillStyle = sel ? '#ffffff' : col;
+      // the notes sounding under the playhead light up (green, brighter on the attack)
+      const on = playing !== null && playing >= n.start && playing < n.start + n.dur;
+      const fill = on ? (playing - n.start < 0.6 ? '#b6ffd6' : '#2bff88') : sel ? '#ffffff' : col;
+      g.save(); g.shadowColor = on ? '#2bff88' : sel ? '#fff' : col; g.shadowBlur = on ? 16 : sel ? 12 : 6;
+      g.fillStyle = fill;
       SDAW.roundRect(g, x + 1, y + 1, w - 1, rh() - 2, 3); g.fill(); g.restore();
       g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x + w - 4, y + 3, 2, rh() - 6);
       if (n.fret !== undefined && w > 18) { g.fillStyle = '#10101e'; g.font = '700 10px Segoe UI'; g.fillText(String(n.fret), x + 4, y + rh() - 4); }
@@ -95,6 +118,7 @@
     // playhead (inside the pattern)
     const ph = localTick(p, SDAW.audio.getTick());
     if (ph !== null) { g.fillStyle = '#ffffff'; g.fillRect(KEY_W + ph * tw(), 0, 1.5, H); }
+    if (ph !== null && !SDAW.audio.patternMode) follow(p, ph);
 
     if (!pr.scrolled) {
       pr.scrolled = true;
@@ -104,6 +128,22 @@
     }
   };
 
+  /** while the song plays: keep the playhead and the notes that sound inside the visible area */
+  let followId = null;
+  function follow(p, ph) {
+    const view = $('#view-pianoroll'); if (!view) return;
+    const x = KEY_W + ph * tw();
+    if (followId !== p.id) { followId = p.id; view.scrollLeft = 0; }
+    if (x > view.scrollLeft + view.clientWidth - 60 || x < view.scrollLeft + KEY_W) view.scrollLeft = Math.max(0, x - KEY_W - 40);
+    const near = p.notes.filter(n => n.start <= ph + 4 && n.start + n.dur >= ph - 4);
+    if (!near.length) return;
+    const top = Math.max(...near.map(n => n.pitch)), bot = Math.min(...near.map(n => n.pitch));
+    const yTop = (HIGH - top) * rh(), yBot = (HIGH - bot + 1) * rh();
+    if (yTop < view.scrollTop || yBot > view.scrollTop + view.clientHeight - VEL_H) {
+      const target = (yTop + yBot) / 2 - (view.clientHeight - VEL_H) / 2;
+      view.scrollTop += (Math.max(0, target) - view.scrollTop) * 0.35;           // glide, no jumps
+    }
+  }
   function localTick(p, tick) {
     if (!SDAW.audio.playing) return null;
     if (SDAW.audio.patternMode) return tick % p.length;

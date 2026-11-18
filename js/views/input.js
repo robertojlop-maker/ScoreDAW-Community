@@ -366,6 +366,19 @@
     requestAnimationFrame(inp.drawFretboard);
   };
 
+  /* ------------------------------------------- INPUT FOLLOWS THE TRACK ---
+   *  Selecting a keyboard track (piano, organ, synth, strings) shows the piano keyboard, which lights
+   *  up the notes it plays during the song; a guitar / bass shows the fretboard. The Chords tab is left
+   *  alone (it was chosen on purpose).                                                               */
+  const KEYBOARD_TYPES = ['keys', 'synth', 'strings'];
+  inp.followTrack = function () {
+    if (inp.mode === 'chords' || !inp.setMode) return;
+    const t = SDAW.store.selTrack(); if (!t) return;
+    const want = KEYBOARD_TYPES.includes(t.type) ? 'piano' : (t.type === 'guitar' || t.type === 'bass') ? 'fretboard' : null;
+    if (want && want !== inp.mode) inp.setMode(want);
+  };
+  SDAW.bus.on('selection', e => { if (e && e.type === 'track') inp.followTrack(); });
+
   /* ============================================================ MIDI == */
   function initMidi() {
     if (!navigator.requestMIDIAccess) return;

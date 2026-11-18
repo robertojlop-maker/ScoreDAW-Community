@@ -57,7 +57,7 @@
 
   function tabLabel(note) {
     const tech = note.tech || {};
-    const label = tech.mute ? 'x' : (tech.harm || tech.pinch) ? '<' + note.fret + '>' : String(note.fret);
+    const label = tech.mute ? 'x' : (tech.harm || tech.pinch || tech.aharm) ? '<' + note.fret + '>' : String(note.fret);
     return tech.ghost || note.tie ? '(' + label + ')' : label;
   }
 
@@ -110,7 +110,7 @@
       if (L.showTab && tech.strum && group.notes.length > 2) {
         for (let string = 0; string < L.nStr; string++) reserve(group.start, 'tab' + string, 17, 0);
       }
-      if (L.showTab && (tech.ring || tech.pm || tech.harm || tech.pinch || tech.tap || tech.trem)) {
+      if (L.showTab && (tech.ring || tech.pm || tech.harm || tech.pinch || tech.aharm || tech.tap || tech.trem)) {
         reserve(group.start, 'tabMark', 6, tech.ring ? 28 : 20);
       }
     });
@@ -475,7 +475,7 @@
     });
 
     // previous note on the same voice (for slides, h/p, ties)
-    const lastByVoice = new Map();
+    const lastByVoice = new Map(), slurStarts = new Map();
     const tupletRuns = {};                // staff and voice -> [groups]
     function noteY(group, note) {
       const staff = staves[group.staff - 1];
@@ -516,7 +516,7 @@
           const hollow = sym.sym === 'w' || sym.sym === 'h';
           if (tn.mute) {
             add(svg('path', { d: `M${x - 5} ${y - 5} L${x + 5} ${y + 5} M${x + 5} ${y - 5} L${x - 5} ${y + 5}`, stroke: col, 'stroke-width': 2, 'data-note': n.id }));
-          } else if (tn.harm || tn.pinch) {
+          } else if (tn.harm || tn.pinch || tn.aharm) {
             add(svg('polygon', { points: `${x - 6},${y} ${x},${y - 5} ${x + 6},${y} ${x},${y + 5}`, fill: hollow ? '#fff' : col, stroke: col, 'stroke-width': 1.5, 'data-note': n.id }));
           } else {
             add(svg('ellipse', { cx: x, cy: y, rx: 6.2, ry: 4.4, transform: `rotate(-20 ${x} ${y})`, fill: hollow ? '#fff' : col, stroke: col, 'stroke-width': hollow ? 1.8 : 1, 'data-note': n.id }));
@@ -524,6 +524,23 @@
           if (tn.ghost) { T(x - 11, y + 5, '(', { 'font-size': 15, fill: col, 'text-anchor': 'middle' }); T(x + 11, y + 5, ')', { 'font-size': 15, fill: col, 'text-anchor': 'middle' }); }
           if (sym.dot) add(svg('circle', { cx: x + 11, cy: y - (step % 2 === 0 ? 3 : 0), r: 1.8, fill: col }));
           nt.pos.push({ id: n.id, x, y, line: ln, start: n.start, voice: g.voice });
+          const bowSlur = tn.bowSlur;
+          if (bowSlur === 'start') slurStarts.set(vk, { x, y, line: ln });
+          if (bowSlur === 'stop' && slurStarts.has(vk)) {
+            const from = slurStarts.get(vk), by = y - 10;
+            const slur = (a, ay, b, by) => {
+              if (b <= a) return;
+              const span = b - a, h = Math.min(24, 7 + span * .06);
+              const curve = ['M', a, ay, 'C', a + span * .3, ay - h, b - span * .3, by - h, b, by].join(' ');
+              add(svg('path', { class: 'bow-slur', d: curve, fill: 'none', stroke: col, 'stroke-width': 1.25 }));
+            };
+            if (from.line === ln) slur(from.x + 2, from.y - 10, x - 2, by);
+            else {
+              slur(from.x + 2, from.y - 10, L.systems[from.line].end - 2, from.y - 10);
+              slur(L.systems[ln].bars[0].x + 2, by, x - 2, by);
+            }
+            slurStarts.delete(vk);
+          }
           // tie arc to the previous same-pitch note
           if (n.tie && prev) {
             const pn = prev.notes.find(q => q.pitch === n.pitch);
@@ -581,6 +598,8 @@
         const above = tabTop - 16;
         let markRow = 0;
         const markAbove = (txt, a) => { T(x - 6, above - 2 - markRow * 13, txt, Object.assign({ 'font-size': 10, 'font-weight': 700 }, a || {})); markRow++; };
+        // slide label: written ONCE per beat, above the tab staff (not on every string, over the numbers)
+        let slideMark = null;
         g.notes.forEach(n => {
           if (n.string === undefined) return;
           const tn = n.tech || {};
@@ -617,7 +636,7 @@
               const pn = prev.notes.find(q => q.string === n.string) || prev.notes[0];
               const px = tickX(L, prev.start), upSl = pn && pn.fret < n.fret;
               add(svg('line', { x1: px + 8, y1: sy + (upSl ? 4 : -4), x2: x - 8, y2: sy + (upSl ? -4 : 4), stroke: INK, 'stroke-width': 1.3 }));
-              T((px + x) / 2, sy - 10, sl === 'legato' ? 'sl. (leg.)' : 'sl.', { 'font-size': 10, 'text-anchor': 'middle', 'font-style': 'italic' });
+              if (!slideMark || sl === 'legato') slideMark = { x: (px + x) / 2, txt: sl === 'legato' ? 'sl. (leg.)' : 'sl.' };
               if (sl === 'legato') add(svg('path', { d: `M${px} ${sy - 9} Q ${(px + x) / 2} ${sy - 22} ${x} ${sy - 9}`, fill: 'none', stroke: INK, 'stroke-width': 1 }));
             } else if (sl === 'inBelow') add(svg('line', { x1: x - 17, y1: sy + 5, x2: x - 8, y2: sy - 1, stroke: INK, 'stroke-width': 1.3 }));
             else if (sl === 'inAbove') add(svg('line', { x1: x - 17, y1: sy - 5, x2: x - 8, y2: sy + 1, stroke: INK, 'stroke-width': 1.3 }));
@@ -636,9 +655,15 @@
         if (tech.pm) markAbove('P.M.');
         if (tech.harm) markAbove('N.H.');
         if (tech.pinch) markAbove('A.H.');
+        if (tech.aharm) markAbove('T.H.');
         if (tech.ring) markAbove('let ring', { 'font-style': 'italic', 'font-weight': 400 });
         if (tech.trem) markAbove('≡', { 'font-size': 14 });
         if (tech.accent && !L.showScore) markAbove('>');
+        if (slideMark) {
+          // one row higher when an H / P label of this beat already sits just above the tab
+          const hp = g.notes.some(n => n.tech && (n.tech.h || n.tech.p));
+          T(slideMark.x, above - 2 - (markRow + (hp ? 1 : 0)) * 13, slideMark.txt, { 'font-size': 10, 'text-anchor': 'middle', 'font-style': 'italic' });
+        }
         const strum = tech.strum;
         if (strum && g.notes.length > 2) {
           const yA = tabTop - 4, yB = tabBot + 4;

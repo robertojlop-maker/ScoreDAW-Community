@@ -146,7 +146,7 @@
     const table = [[/electric piano|\bep\b/, 4], [/clavinet/, 7], [/vibraphone/, 11], [/organ/, 16], [/accordion/, 21], [/harmonica|melodica/, 22], [/piano/, 0],
       [/nylon|classical|requinto|bossa/, 24], [/steel|acoustic|12-string/, 25], [/lead guitar|electric guitar - lead|overdrive/, 29], [/guitar|telecaster|skank|segunda/, 27],
       [/upright bass|baby bass/, 32], [/808|synth bass/, 38], [/pick|slap/, 34], [/bass/, 33],
-      [/fiddle|violin/, 40], [/string/, 48], [/pad/, 89], [/trumpet/, 56], [/trombone/, 57], [/alto sax/, 65], [/tenor sax|sax/, 66], [/flute/, 73],
+      [/fiddle|violin/, 40], [/viola/, 41], [/string/, 48], [/pad/, 89], [/trumpet/, 56], [/trombone/, 57], [/alto sax/, 65], [/tenor sax|sax/, 66], [/flute/, 73],
       [/saw lead|hook/, 81], [/square lead/, 80], [/pluck/, 84]];
     for (const [re, p] of table) if (re.test(n)) return p;
     return { guitar: 25, bass: 33, keys: 0, strings: 48, synth: 81 }[t.type] || 0;
@@ -240,7 +240,15 @@
         const notes = unfolded(t, order, o.unfold).sort((a, b) => a.start - b.start);
         const ends = {};
         notes.forEach(n => {
-          if (n.tie) { const prev = ends[n.pitch]; if (prev && Math.abs(prev.end - n.start * T16) < 2) { prev.ev.t = (n.start + n.dur) * T16; prev.end = prev.ev.t; return; } }
+          const voicePitch = n.pitch + ':' + (n.voice || 0);
+          if (n.tie) {
+            const prev = ends[voicePitch];
+            if (prev && Math.abs(prev.end - (n.start + swingTicks(n.start)) * T16) < 2) {
+              prev.ev.t = (n.start + n.dur + swingTicks(n.start)) * T16;
+              prev.end = prev.ev.t;
+              return;
+            }
+          }
           const tech = n.tech || {};
           let vel = n.dyn ? DYN[n.dyn] : (n.vel || 90);
           if (tech.accent) vel += 20; if (tech.ghost) vel *= 0.45;
@@ -249,7 +257,7 @@
           let len = n.dur * T16; if (tech.stacc) len *= 0.5;
           const off = { t: on + Math.max(10, len - 4), o: 2, d: [0x80 | ch, n.pitch, 0] };
           ev.push({ t: on, o: 3, d: [0x90 | ch, n.pitch, vel] }, off);
-          ends[n.pitch] = { ev: off, end: off.t };
+          ends[voicePitch] = { ev: off, end: on + n.dur * T16 };
           if (tech.bend) {
             const amt = Math.min(2, tech.bend) / 2, top = Math.min(16383, Math.round(8192 + amt * 8191));
             const pb = (t2, v) => ({ t: t2, o: 1, d: [0xE0 | ch, v & 127, (v >> 7) & 127] });
@@ -323,6 +331,14 @@
         if (n.tup) break;                                 // tuplets never cross a barline
       }
     });
+    if (t.engine === 'bowed') {
+      const previous = new Map();
+      notes.forEach(n => {
+        const key = n.pitch + ':' + (n.voice || 0), prev = previous.get(key);
+        if (n.tie && prev && Math.abs(prev.start + prev.dur - n.start) < .001) prev._tieOut = true;
+        previous.set(key, n);
+      });
+    }
     const avg = notes.length ? notes.reduce((a, n) => a + n.pitch, 0) / notes.length : 60;
     const flats = SDAW.songgen ? SDAW.songgen.prefersFlats(SDAW.noteIndex(song.key), song.scale) : false;
     const SP = flats ? FLAT_SP : SHARP_SP;
@@ -406,6 +422,8 @@
                 // notations
                 let no = '';
                 if (tieStop) no += '<tied type="stop"/>'; if (tieStart) no += '<tied type="start"/>';
+                if (firstPc && tech.bowSlur === 'start') no += '<slur type="start" number="1"/>';
+                if (lastPc && tech.bowSlur === 'stop') no += '<slur type="stop" number="1"/>';
                 if (pc.tup && ni === 0) { const k = (tripCount - 1) % 3; if (k === 0) no += '<tuplet type="start" bracket="yes"/>'; if (k === 2) no += '<tuplet type="stop"/>'; }
                 if (firstPc) {
                   let tq = '';
@@ -416,6 +434,7 @@
                   if (tech.harm) tq += '<harmonic><natural/></harmonic>';
                   if (tech.aharm) tq += '<harmonic><artificial/></harmonic>';
                   if (tech.tap) tq += '<tap/>';
+                  if (tech.pizz) tq += '<other-technical>pizzicato</other-technical>';
                   if (tech.pm) tq += '<other-technical>P.M.</other-technical>';
                   if (tech.ring) tq += '<other-technical>let ring</other-technical>';
                   if (tq) no += `<technical>${tq}</technical>`;

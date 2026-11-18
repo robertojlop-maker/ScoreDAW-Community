@@ -81,7 +81,8 @@
   /** Load an asset: as = 'text' | 'json' | 'buffer' (ArrayBuffer) */
   GL.loadAsset = async function (path, as) {
     if (!GL.fromDisk()) {
-      const r = await fetch(GL.asset(path));
+      // revalidate with the server: a corrected library (e.g. re-tuned samples) must not come from an old cache
+      const r = await fetch(GL.asset(path), { cache: 'no-cache' });
       if (!r.ok) throw new Error(path + ' (' + r.status + ')');
       return as === 'text' ? r.text() : as === 'json' ? r.json() : r.arrayBuffer();
     }

@@ -1,0 +1,10 @@
+VS Chamber Orchestra 2 Community Edition, CC0 1.0.
+Recordings: Sam Gossner & Simon Dalzell. Sample cutting: Elan Hickler / Soundemote.
+Solo Violin, Violin Section and Viola Section, arco vibrato, spiccato and pizzicato.
+https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e/Strings
+Encoded as Opus for ScoreDAW.
+
+Solo Viola: University of Iowa Electronic Music Studios, Musical Instrument Samples.
+Created by Lawrence Fritts and the EMS team. The project states that these recordings may be used without restrictions.
+https://theremin.music.uiowa.edu/mis.html
+https://theremin.music.uiowa.edu/MIS-Pitches-2012/MISViola2012.html

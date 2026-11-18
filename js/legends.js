@@ -88,16 +88,20 @@
      *  −8 −5 (7) · −10 −7 (6). Double stops in the solos are mostly 4ths (then 3rds), harmonics at the
      *  5th / 7th / 12th fret, whole-tone bends, whammy dives, legato in 89 songs, triplets everywhere. */
     vanhalen: H('Eddie Van Halen', 'two-hand tapping (tap – pull – hammer), legato flurries, double stops in 4ths, harmonics, tremolo picking and dive bombs', {
-      scale: { minor: 'blues', major: 'mixoBlues' }, legato: 0.8, bend: 0.4,
+      scale: { minor: 'blues', major: 'mixoBlues' }, legato: 0.8, bend: 0.4, slide: 0.35,
       tapFigs: [[[-5, -2], 26], [[-7, -4], 14], [[-2, -5], 10], [[-4, -7], 10], [[-7, -3], 8], [[-6, -3], 8], [[-8, -5], 7], [[-10, -7], 6], [[-4, -2], 5]],
+      // the original vocabulary (tapping, legato, 4ths, dives, harmonics) plus, now and then, a long tremolo
+      // climb on the 1st string and a short run of harmonics (natural or tapped) — measured from his songs
       sig: [[['tap', 16, {}]], [['tap', 8, {}], ['run', 8, { dir: -1, fast: 1, leg: 1 }]], [['trem', 4, {}], ['run', 8, { dir: 1, fast: 1, leg: 1 }], ['hold', 4, { dive: 1 }]],
         [['harm', 4, {}], ['run', 12, { g: 3, dir: -1, leg: 1 }]], [['hold', 6, { bend: 1 }], ['tap', 10, { walk: 1 }]],
         [['ds', 8, { kind: 'fourths' }], ['hold', 8, { dive: 1 }]], [['harm', 4, {}], ['tap', 12, { walk: 1 }]],
         [['run', 8, { g: 3, dir: -1, leg: 1, fast: 1 }], ['ds', 8, { kind: 'fourths', dir: 1 }]], [['trem', 8, { high: 1 }], ['hold', 8, { dive: 1 }]],
-        [['ds', 16, { kind: 'fourths' }]]],
+        [['ds', 16, { kind: 'fourths' }]],
+        [['tremrun', 16, {}]], [['hold', 4, { pinch: 1 }], ['tremrun', 12, { n: 5 }]],
+        [['harmrun', 8, {}], ['run', 8, { dir: -1, fast: 1, leg: 1 }]]],
       peak: [[['tap', 12, { walk: 1 }], ['hold', 4, { dive: 1 }]], [['run', 12, { dir: 1, fast: 1, leg: 1 }], ['hold', 4, { high: 1, pinch: 1 }]],
-        [['tap', 16, { walk: 1 }]], [['ds', 8, { kind: 'fourths', dir: 1 }], ['tap', 8, { walk: 1 }]]],
-      fill: [[['tap', 8, {}]], [['run', 4, { dir: 1, leg: 1 }], ['hold', 4, { dive: 1 }]], [['ds', 8, { kind: 'fourths' }]], [['harm', 8, {}]]] }),
+        [['tap', 16, { walk: 1 }]], [['ds', 8, { kind: 'fourths', dir: 1 }], ['tap', 8, { walk: 1 }]], [['tremrun', 16, { n: 7 }]]],
+      fill: [[['tap', 8, {}]], [['run', 4, { dir: 1, leg: 1 }], ['hold', 4, { dive: 1 }]], [['ds', 8, { kind: 'fourths' }]], [['harm', 8, {}]], [['hold', 8, { pinch: 1, bend: 1 }]]] }),
     satriani: H('Joe Satriani', 'Lydian / Mixolydian melodies, liquid legato, whammy bar, harmonics', {
       scale: { minor: 'dorian', major: 'lydian' }, legato: 0.9, slide: 0.5, vib: 'wvib',
       sig: [[['run', 16, { dir: 1, leg: 1, scale: 1, fast: 1 }]], [['mel', 8, {}], ['run', 8, { dir: -1, leg: 1, scale: 1, fast: 1 }]], [['hold', 8, { si: 1 }], ['hold', 8, { dive: 1, high: 1 }]],
@@ -714,14 +718,113 @@
     const p = ctNear(S, T, o.high ? S.center + 10 : S.p + 3);
     S.emit(T, len, p, { trem: true }, { acc: 4 }); S.p = p;
   };
-  /** natural harmonics (12th fret) that belong to the chord or the scale */
-  G.harm = function (S, T, len) {
+  /**
+   * natural harmonics that belong to the chord (or the scale). Frets 12 (octave), 7 (octave + 5th)
+   * and 5 (two octaves) — o.frets chooses them (default 12 only). o.pairs = two neighbouring strings
+   * at once, ringing (the Van Halen "chime"); the written pitch is the fretted note, the rig sounds
+   * the harmonic (CONFIG.guitarRig.harmonics).
+   */
+  const HARM_UP = { 12: 12, 7: 19, 5: 24 };
+  G.harm = function (S, T, len, o = {}) {
     if (S.ctx.mel?.harmonics === false) return G.hold(S, T, len, {});
     const tun = TUN(), cp = chordAt(S, T).pcs, sp = pcsAt(S, T, 'scale');
-    const ok = [5, 4, 3, 2].filter(s => cp.includes(mod12(tun[s]))).concat([5, 4, 3, 2].filter(s => sp.includes(mod12(tun[s]))));
-    if (!ok.length) return G.hold(S, T, len, {});
-    const n = len >= 8 ? 2 : 1, d = len / n;
-    for (let k = 0; k < n; k++) { const s = ok[k % ok.length]; S.emit(T + k * d, d, tun[s] + 12, { harm: true }, { string: s, fret: 12, acc: 4 }); }
+    const frets = (o.frets || [12]).filter(f => HARM_UP[f]);
+    // every string / fret whose harmonic is a chord tone (then a scale tone)
+    const spots = [];
+    frets.forEach(f => [5, 4, 3, 2, 1].forEach(st => {
+      const pc = mod12(tun[st] + HARM_UP[f]);
+      if (cp.includes(pc)) spots.push({ st, f, w: 2 }); else if (sp.includes(pc)) spots.push({ st, f, w: 1 });
+    }));
+    if (!spots.length) return G.hold(S, T, len, {});
+    const best = spots.filter(x => x.w === 2).length ? spots.filter(x => x.w === 2) : spots;
+    const n = len >= 8 ? (o.pairs ? 2 : S.R.pick([2, 3])) : 1, d = len / n;
+    for (let k = 0; k < n; k++) {
+      const a = S.R.pick(best);
+      const notes = [a];
+      // the neighbouring string at the same fret, when its harmonic fits too
+      if (o.pairs) { const b = best.find(x => x.f === a.f && Math.abs(x.st - a.st) === 1); if (b) notes.push(b); }
+      notes.forEach(x => S.emit(T + k * d, d, tun[x.st] + x.f, { harm: true, ring: k === n - 1 }, { string: x.st, fret: x.f, acc: 4 }));
+    }
+  };
+  /**
+   * Runs of harmonics, as in the Van Halen songs (3 – 8 in a row, mostly 8ths, sometimes 16ths):
+   *   zig     two neighbouring strings in turn, moving through the 3rd – 5th – 7th – 12th fret nodes
+   *           (or back down) — on the low strings too
+   *   cross   one fret across three strings, up and back
+   *   walk    one string, the nodes 12 – 7 – 5 – 3 (each played twice) or 3 – 4 – 5 – 7
+   *   tapped  tapped harmonics: a chord shape fretted, every note tapped 12 frets higher (aharm)
+   * Only harmonics that sound a chord or scale tone are used; the last one rings, and natural ones
+   * often get a whammy dip / dive.
+   */
+  const NODE = { 12: 12, 7: 19, 5: 24, 4: 28, 9: 28, 3: 31 };
+  G.harmrun = function (S, T, len, o) {
+    if (S.ctx.mel?.harmonics === false) return G.run(S, T, len, { dir: 1, leg: 1 });
+    const R = S.R, tun = TUN(), sp = pcsAt(S, T, 'scale'), cp = chordAt(S, T).pcs;
+    const fits = (st, f) => { const pc = mod12(tun[st] + NODE[f]); return cp.includes(pc) || sp.includes(pc); };
+    const step = o.d || (R.chance(0.75) ? 2 : 1), n = Math.max(3, Math.floor(len / step));
+    const shape = o.shape || R.pick(['zig', 'zig', 'zig', 'cross', 'cross', 'walk', 'tapped']);
+    let seq = [];
+    if (shape === 'zig') {
+      const st = R.int(0, 4), frets = [3, 5, 7, 12].filter(f => fits(st, f) && fits(st + 1, f));
+      if (R.chance(0.4)) frets.reverse();
+      frets.forEach(f => seq.push({ st, f }, { st: st + 1, f }));
+    } else if (shape === 'cross') {
+      const f = R.pick([5, 7, 12, 5, 7]);
+      const strs = [0, 1, 2, 3, 4, 5].filter(st => fits(st, f));
+      const run = strs.slice(R.int(0, Math.max(0, strs.length - 3))).slice(0, 3);
+      seq = run.concat(run.slice(0, -1).reverse()).map(st => ({ st, f }));
+    } else if (shape === 'walk') {
+      const st = R.int(0, 5);
+      const frets = (R.chance(0.5) ? [12, 12, 7, 7, 5, 5, 3, 3] : [3, 4, 5, 7, 5, 4]).filter(f => fits(st, f));
+      seq = frets.map(f => ({ st, f }));
+    } else {
+      // tapped harmonics over a chord shape around the hand position
+      const ch = chordAt(S, T), hand = clamp(Math.round(S.p - tun[3]), 2, 9);
+      [2, 3, 4, 3].forEach(st => {
+        for (let f = Math.max(0, hand - 2); f <= hand + 2; f++) if (ch.pcs.includes(mod12(tun[st] + f))) { seq.push({ st, f, tapped: true }); break; }
+      });
+    }
+    if (seq.length < 2) return G.harm(S, T, len, { frets: [12, 7, 5], pairs: 1 });
+    for (let k = 0; k < n; k++) {
+      const x = seq[k % seq.length], at = T + k * step, last = k === n - 1;
+      const d = last ? T + len - at : step;
+      if (d <= 0) break;
+      const tech = x.tapped ? { aharm: true } : { harm: true };
+      if (last) { tech.ring = true; if (!x.tapped && R.chance(0.4)) tech.slide = 'outDown'; }
+      S.emit(at, d, tun[x.st] + x.f, tech, { string: x.st, fret: x.f, acc: last ? 6 : 3 });
+    }
+  };
+
+  /**
+   * Van Halen's tremolo run on the 1st string: a long climb of 5 – 7 notes up the scale, each one
+   * tremolo-picked (the three slashes over the note); the last one is held much longer — bent up into a
+   * chord tone, or with vibrato.
+   */
+  G.tremrun = function (S, T, len, o) {
+    const R = S.R, tun = TUN(), st = o.string ?? (R.chance(0.7) ? 5 : 3), low = tun[st] + 3, high = Math.min(tun[st] + FRETS() - 2, S.hi + 2);
+    const sc = lad(S, T, 'scale').filter(x => x >= low && x <= high);
+    const ct = ctLad(S, T + len - 1).filter(x => x >= low + 4 && x <= high);
+    if (sc.length < 4 || !ct.length) return G.trem(S, T, len, { high: 1 });
+    let n = o.n || R.pick([5, 6, 6, 7]);
+    // the last note: a chord tone above where the line is, reached with a bend from the scale note below
+    const target = ct[clamp(nearIdx(ct, S.p + 5), 0, ct.length - 1)];
+    let bend = 0, top = target;
+    if (S.bends && (o.bend || R.chance(0.6))) {
+      const under = sc.filter(x => x < target && target - x <= 2);
+      if (under.length) { top = under[0]; bend = target - top; }
+    }
+    // the climb: as many notes as fit (16ths at least) before the long last note
+    const last = Math.max(4, Math.round(len * 0.3));
+    n = Math.max(3, Math.min(n, Math.floor(len - last) + 1));
+    const below = sc.filter(x => x < top).slice(-(n - 1));
+    const line = below.concat([top]);
+    const step = Math.max(1, Math.floor((len - last) / Math.max(1, line.length - 1)));
+    line.forEach((p, i) => {
+      const at = T + i * step, end = i === line.length - 1 ? T + len : at + step;
+      const tech = i < line.length - 1 ? { trem: true } : Object.assign(bend ? { bend, bendType: 'up' } : {}, vibOf(S));
+      S.emit(at, end - at, p, tech, { string: st, fret: p - tun[st], acc: i === line.length - 1 ? 8 : 4 });
+    });
+    S.p = target;
   };
   /** rake: muted strings swept into an accented bent note */
   G.rake = function (S, T, len) {
@@ -1047,7 +1150,7 @@
         tech = Object.assign({}, tech);
         if (ctx.mel?.slides === false) delete tech.slide;
         if (ctx.mel?.vibrato === false) { delete tech.vib; delete tech.wvib; }
-        if (ctx.mel?.harmonics === false) { delete tech.harm; delete tech.pinch; }
+        if (ctx.mel?.harmonics === false) { delete tech.harm; delete tech.pinch; delete tech.aharm; }
         if (d > 0.01) this.notes.push(Object.assign({ T, d, pitch, tech }, x || {}));
       } };
     const cx = ctx.opts.complexity === undefined ? 0.5 : ctx.opts.complexity;

@@ -147,6 +147,20 @@
   };
 
   /* ==================================================== TRANSPORT ===== */
+  app.cueSong = function (tick) {
+    const A = SDAW.audio;
+    if (app.patPreview) app.stopViewPattern();
+    if (A.patternMode) {
+      A.patternMode = false;
+      app.syncTransport();
+    }
+    if (A.loop.on && A.loop.end !== null && (tick < A.loop.start || tick >= A.loop.end)) {
+      A.loop = { on: false, start: 0, end: null };
+      app.syncTransport();
+      SDAW.arrange.render();
+    }
+    A.seek(tick);
+  };
   app.togglePlay = function () {
     if (app.patPreview) app.stopViewPattern();
     if (SDAW.audio.playing || SDAW.audio.preparing) app.pause();
@@ -361,35 +375,59 @@
     app.syncTransport();
   };
 
-  function showNewSongEditor() {
-    const s = SDAW.store, song = s.song;
-    const specs = song.gen?.by === 'songgen' ? SDAW.songgen.styleOf(song.gen.opts).tracks : null;
-    const lead = song.tracks.find(track => track.type === 'guitar' && (specs
-      ? specs.some(spec => spec.id === track.styleTrack && spec.lead)
-      : SDAW.autogen.autoRole(track, song) === 'melody'));
-    const drums = song.tracks.find(track => track.type === 'drums');
-    const track = lead || drums;
+  /**
+   * The track a song opens on (app start, a new or generated song), in this order:
+   *   1. the Lead Guitar          2. the instrument that plays the melody (not a singer)
+   *   3. a piano                  4. the drums / percussion          5. the first track
+   * and the editor tab that fits it: drums → Pattern, guitar → Score + Tab, others → Score.
+   */
+  app.defaultTrack = function (song) {
+    song = song || SDAW.store.song;
+    const tracks = song.tracks || [];
+    let specs = null;
+    try { specs = song.gen?.by === 'songgen' && SDAW.songgen ? SDAW.songgen.styleOf(song.gen.opts).tracks : null; } catch (e) { specs = null; }
+    const specOf = t => specs && specs.find(sp => sp.id === t.styleTrack);
+    const isVoice = t => /vocal|choir|coro|voz|voice/i.test(t.name + ' ' + (t.instrument || '')) || ['vocal', 'choir'].includes(specOf(t)?.role);
+    const role = t => SDAW.autogen ? SDAW.autogen.autoRole(t, song) : '';
+    const isLead = t => specOf(t)?.lead || (specs ? false : /lead/i.test(t.name));
+    // chamber music: the lead instrument chosen in the Classical panel
+    const chamberLead = song.gen?.opts?.chamber?.lead || (song.gen?.opts?.genre === 'Classical' && SDAW.classical ? SDAW.classical.settings(song.gen.opts, SDAW.songgen.styleOf(song.gen.opts)).lead : null);
+    return tracks.find(t => t.type === 'guitar' && isLead(t))
+      || tracks.find(t => t.type === 'guitar' && /lead guitar/i.test(t.name))
+      || (chamberLead && tracks.find(t => t.styleTrack === chamberLead))
+      || tracks.find(t => t.type !== 'drums' && !isVoice(t) && (isLead(t) || specOf(t)?.role === 'melody'))
+      || tracks.find(t => t.type !== 'drums' && t.type !== 'bass' && !isVoice(t) && !specs && role(t) === 'melody')
+      // no lead line in the band (funk, some Latin grooves): the horn section plays the melodic riffs
+      || tracks.find(t => !isVoice(t) && ['horns', 'counter'].includes(specOf(t)?.role))
+      || tracks.find(t => /piano/i.test(t.name + ' ' + (t.instrument || '')))
+      || tracks.find(t => t.type === 'drums')
+      || tracks[0] || null;
+  };
+  /** select the default track of the song and open the editor tab that fits it */
+  app.selectDefaultTrack = function () {
+    const s = SDAW.store, track = app.defaultTrack(s.song);
     if (!track) return false;
-
     s.selectTrack(track.id);
-    if (lead) {
-      app.showView('scoretab');
-      const firstNote = s.trackNotes(lead)[0];
-      SDAW.notation.scrollToTick(firstNote?.start ?? 0);
-    } else {
-      const clip = drums.clips.find(c => c.kind === 'pattern' && s.pattern(c.patternId)?.kind === 'drums');
+    SDAW.input.followTrack?.();          // piano keyboard for a keyboard track, fretboard for a guitar
+    if (track.type === 'drums') {
+      const clip = track.clips.find(c => c.kind === 'pattern' && s.pattern(c.patternId)?.kind === 'drums');
       if (clip) s.setCursor(clip.start);
-      SDAW.pattern.rack.open[drums.id] = true;
+      SDAW.pattern.rack.open[track.id] = true;
       app.showView('pattern');
       $('#view-pattern .ch-name.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    } else {
+      app.showView(track.type === 'guitar' ? 'scoretab' : 'score');
+      const firstNote = s.trackNotes(track)[0];
+      if (firstNote) s.setCursor(firstNote.start);
+      SDAW.notation.scrollToTick(firstNote?.start ?? 0);
     }
     $('#arrScroll .trk-head.sel')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     return true;
-  }
+  };
 
   app.loadNewSong = function (song, keepUndo) {
     app.loadSong(song, keepUndo);
-    showNewSongEditor();
+    app.selectDefaultTrack();
   };
   /**
    * Autosave: localStorage (fast); when it is full, IndexedDB (no size limit) + one warning.
@@ -531,7 +569,31 @@
   /* ================================================ WELCOME SCREEN ===== */
   app.showWelcome = function () {
     const close = () => back.remove();
-    const genreSel = el('select', { onclick: e => e.stopPropagation() }, CONFIG.library.genres.map(g => el('option', { value: g }, g)));
+    /* "Start with a style": three small tabs (Genre · Band · Guitarist) fill one short dropdown,
+     * alphabetical (genres grouped by family). It always opens on the tab and style of
+     * CONFIG.ui.welcomeDefault (Band · Van Halen). */
+    const SG = SDAW.songgen, groups = SG.styleGroups();
+    const KINDS = [['genre', 'Genre'], ['band', 'Band'], ['guitarist', 'Guitarist']];
+    const W = CONFIG.ui.welcomeDefault || {};
+    let kind = SDAW.STYLES[W.style] ? SG.groupOfStyle(W.style) : 'genre';
+    const genreSel = el('select', { onclick: e => e.stopPropagation(), 'aria-label': 'Style' });
+    const fillStyles = () => {
+      genreSel.innerHTML = '';
+      if (kind === 'genre') groups.genre.forEach(([fam, names]) => genreSel.appendChild(el('optgroup', { label: fam }, names.map(g => el('option', { value: g, selected: g === W.style ? true : null }, g)))));
+      else groups[kind].forEach(g => genreSel.appendChild(el('option', { value: g, selected: g === W.style ? true : null }, g)));
+    };
+    const kindTabs = el('div', { class: 'w-kinds', role: 'tablist', onclick: e => e.stopPropagation() });
+    const drawTabs = () => {
+      kindTabs.innerHTML = '';
+      KINDS.forEach(([k, label]) => kindTabs.appendChild(el('button', {
+        class: 'w-kind' + (k === kind ? ' active' : ''), role: 'tab', 'aria-selected': k === kind ? 'true' : 'false',
+        'data-help': { genre: 'Musical genres (Pop, Salsa, Blues, Classical…)', band: 'Songs in the style of a band', guitarist: 'Songs in the style of a great guitarist' }[k],
+        onclick: e => {
+          e.stopPropagation(); kind = k;
+          drawTabs(); fillStyles();
+        } }, label)));
+    };
+    drawTabs(); fillStyles();
     const meterSel = el('select', { onclick: e => e.stopPropagation(), 'data-help': 'Time signature of the new song' }, SDAW.TIME_SIGS.map(([n, d]) => el('option', { value: n + '/' + d, selected: n === 4 && d === 4 ? true : null }, n + '/' + d)));
     const back = el('div', { class: 'modal-back' }, [
       el('div', { class: 'modal' }, [
@@ -542,8 +604,9 @@
         ]),
         el('div', { class: 'wcards' }, [
           el('div', { class: 'wcard style', 'data-help': 'Creates drums, bass, piano, guitar strums and a melody in the chosen style. Everything stays editable.', onclick: () => {
-            const sg = SDAW.buildSong(genreSel.value); close(); app.loadNewSong(sg); SDAW.toast(genreSel.value + ' song ready (' + SDAW.songIdeaText(sg) + ') — press Space to play');
-          } }, [el('div', { class: 'wico' }, '🎵'), el('h3', {}, 'Start with a style'), el('p', {}, 'Choose a genre and get a ready-to-edit song.'), genreSel,
+            // the welcome style starts with its own options (e.g. Van Halen: the lead as soloist, fast runs)
+            const sg = genreSel.value === W.style ? SG.createSong(SG.startDefaults(SG.variedDefaults(genreSel.value))) : SDAW.buildSong(genreSel.value); close(); app.loadNewSong(sg); SDAW.toast(genreSel.value + ' song ready (' + SDAW.songIdeaText(sg) + ') — press Space to play');
+          } }, [el('div', { class: 'wico' }, '🎵'), el('h3', {}, 'Start with a style'), el('p', {}, 'Choose a genre, a band or a guitarist and get a ready-to-edit song.'), kindTabs, genreSel,
             // every option of the Full Song panel: instruments, key, form, progressions, the lead in each section, ending…
             el('button', { class: 'btn small w-custom', 'data-help': 'Choose everything: instruments (add any), singer, key, tempo, form, progressions, complexity, the guitarist style, what the lead plays in each section and the ending',
               onclick: e => { e.stopPropagation(); SDAW.songgen.open({ genre: genreSel.value, onDone: close }); } }, '⚙ Choose everything…')]),
@@ -709,7 +772,7 @@
     SDAW.audio.loop = { on: false, start: 0, end: null };
     SDAW.store.load(song);
     // a large project was autosaved in IndexedDB: open it as soon as it is read
-    if (bigAutosave) SDAW.samples.loadAutosave().then(json => { if (json) { const sg = JSON.parse(json); if (sg && sg.tracks) app.loadSong(sg); } }).catch(() => {});
+    if (bigAutosave) SDAW.samples.loadAutosave().then(json => { if (json) { const sg = JSON.parse(json); if (sg && sg.tracks) { app.loadSong(sg); app.selectDefaultTrack(); } } }).catch(() => {});
 
     buildMenus();
     bindParams(); syncParams();
@@ -758,14 +821,18 @@
     SDAW.bus.on('selection', (e) => { if (!e || e.type !== 'duration') app.renderEditor(); });
     SDAW.bus.on('songLoaded', () => { SDAW.arrange.render(); SDAW.inspector.render(); SDAW.library.render(); });
     SDAW.bus.on('transport', () => { app.syncTransport(); syncMini(); });
-    SDAW.bus.on('layout', () => requestAnimationFrame(() => { SDAW.input.drawFretboard(); if (['score', 'tab', 'scoretab'].includes(app.view)) SDAW.notation.render(); }));
+    SDAW.bus.on('layout', () => requestAnimationFrame(() => { SDAW.input.drawFretboard(); if (['score', 'tab', 'scoretab'].includes(app.view)) SDAW.notation.render(); if (app.view === 'pianoroll') SDAW.pianoroll.render(); }));
+    window.addEventListener('resize', SDAW.debounce(() => { if (app.view === 'pianoroll') SDAW.pianoroll.render(); }, 120));
     // audio starts only after a user gesture (browser rule)
     document.addEventListener('mousedown', () => SDAW.audio.init(), { once: true });
     document.addEventListener('keydown', () => SDAW.audio.init(), { once: true });
 
     SDAW.arrange.render();
     SDAW.inspector.render();
-    if (!(needsDemo && !bigAutosave && showNewSongEditor())) app.showView(app.view);
+    // the song opens on its Lead Guitar (or melody / piano / drums) with the matching editor tab
+    let opened = false;
+    try { opened = app.selectDefaultTrack(); } catch (e) { console.warn('ScoreDAW: default track', e); }
+    if (!opened) app.showView(app.view);
     app.syncTransport();
     requestAnimationFrame(frame);
     if (CONFIG.ui.showWelcome && !localStorage.getItem('scoredaw.noWelcome')) app.showWelcome();

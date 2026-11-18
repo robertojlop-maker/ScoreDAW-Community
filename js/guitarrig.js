@@ -383,19 +383,21 @@
     let midi = pitch, harm = false, b0 = 0;
     if (tech.harm) { harm = true; const h = C.harmonics[fret]; midi = h !== undefined ? tun[st] + h : pitch + 12; }
     else if (tech.pinch) { harm = true; midi = pitch + C.pinchHarmonic; }
+    else if (tech.aharm) { harm = true; midi = pitch + 12; }          // artificial / tapped harmonic: 12 frets above the fretted note
     const on = {
       type: 'on', t, s: st, midi, vel, id: ++r.nid, pm: !!tech.pm, dead: !!tech.mute,
       vib: !!(tech.vib || tech.wvib), vibMul: tech.wvib ? C.wideVibrato : 1, legato: false, glide: 0, harm
     };
     const before = due.slice(), after = [];
-    const slideT = clamp(T.slideTime || 0.12, 0.03, 0.4);
+    const slideT = clamp(tech.slideTime || T.slideTime || 0.12, 0.03, 0.4);
     if (legato && ringing) on.legato = true;
     // ---- slides
     if (sl === true || sl === 'legato') {
-      if (ringing) { on.legato = true; on.glide = slideT; }
-      else if (opts.prevPitch !== undefined && opts.prevPitch !== pitch && Math.abs(opts.prevPitch - pitch) <= 12) {
+      const from = Number.isFinite(tech.slideInterval) ? pitch - tech.slideInterval : opts.prevPitch;
+      if (ringing && (!Number.isFinite(tech.slideInterval) || L.midi === from)) { on.legato = true; on.glide = slideT; }
+      else if (from !== undefined && from !== pitch && Math.abs(from - pitch) <= 12) {
         const pre = Math.min(0.12, slideT);                     // grace note on the previous pitch, then glide
-        before.push({ type: 'on', t: Math.max(0, t - pre), s: st, midi: opts.prevPitch, vel: vel * 0.9, id: ++r.nid, legato: false, glide: 0 });
+        before.push({ type: 'on', t: Math.max(0, t - pre), s: st, midi: from, vel: vel * 0.9, id: ++r.nid, legato: false, glide: 0 });
         on.legato = true; on.glide = pre * 0.8;
       }
     } else if (sl === 'shift') {
